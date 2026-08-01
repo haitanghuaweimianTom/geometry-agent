@@ -9,7 +9,7 @@ Typography follows formal mathematical writing conventions (cf. amsart style):
   - Chinese text stays in text mode; only genuine math expressions enter ``$...$``.
   - Proof derivations use ``align*`` for aligned multi-step equations.
   - ``amsthm`` proof environments for proof-type questions.
-  - ``\displaystyle`` for readable fractions and large operators.
+  - ``\\displaystyle`` for readable fractions and large operators.
 
 Public API: solution_to_latex, multi_question_to_latex.
 """
@@ -143,13 +143,14 @@ def _to_chinese(text: str) -> str:
 # segment instead of being split into three.
 
 _MATH_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
-_MATH_OPS = set("+-=*/().,^√π·×÷±∓<>≤≥≠≈≅∽∝|[]{}_")
-_MATH_GEO = set("∠⊥∥△→∵∴∈²³°∪∩⊂⊃∅∞")
+# （ ） ， are included so full-width coordinates like （1，2） stay in one math segment
+_MATH_OPS = set("+-=*/().,^√π·×÷±∓<>≤≥≠≈≅∽∝|[]{}_（），∶")
+_MATH_GEO = set("∠⊥∥△→∵∴∈²³°∪∩⊂⊃∅∞⌒⊙□∟≡∉∀∃⇒⇔⋯…∼∘∂∑∏∫′")
 # Greek letters used in geometry (θ, α, β, γ, φ, ω, λ, μ, etc.)
 _MATH_GREEK = set("θαβγδεζηικμνξπρστυφχψωΘΑΒΓΔΛΣΦΨΩ")
 # Unicode subscript characters (₁₂₃...) and superscript (⁴⁵...)
 _MATH_SUB = set("₀₁₂₃₄₅₆₇₈₉")
-_MATH_SUP = set("⁰¹²³⁴⁵⁶⁷⁸⁹")
+_MATH_SUP = set("⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
 
 # Single-char symbol → LaTeX command.  IMPORTANT: commands that end in a letter
 # MUST have a trailing space so they don't merge with following letters
@@ -173,13 +174,67 @@ _SYM_TO_LATEX = {
     "∈": r"\in ",
     "²": "^2",
     "³": "^3",
+    "¹": "^1",
     "√": r"\sqrt ",
     "π": r"\pi ",
     "°": r"^{\circ}",
     "∪": r"\cup ",
     "∩": r"\cap ",
     "∞": r"\infty ",
-    # Greek letters
+    # ---- v2: added symbols (all must render correctly) ----
+    "∝": r"\propto ",
+    "±": r"\pm ",
+    "∓": r"\mp ",
+    "÷": r"\div ",
+    "≡": r"\equiv ",
+    "⊂": r"\subset ",
+    "⊃": r"\supset ",
+    "⊆": r"\subseteq ",
+    "⊇": r"\supseteq ",
+    "∉": r"\notin ",
+    "∀": r"\forall ",
+    "∃": r"\exists ",
+    "⇒": r"\Rightarrow ",
+    "⇔": r"\Leftrightarrow ",
+    "⊙": r"\odot ",
+    "□": r"\square ",
+    "∟": r"\lrcorner ",
+    "⋯": r"\cdots ",
+    "…": r"\ldots ",
+    "∼": r"\sim ",
+    "∘": r"\circ ",
+    "∂": r"\partial ",
+    "∑": r"\sum ",
+    "∏": r"\prod ",
+    "∫": r"\int ",
+    "′": "'",
+    "∅": r"\varnothing ",
+    "⌒": r"\frown ",  # fallback; "⌒AB" is handled by the overset pre-pass below
+    "⁻": "^{-}",  # ⁻¹ is handled by the pre-pass; lone ⁻ kept valid
+    # Greek letters (complete set)
+    "ε": r"\varepsilon ",
+    "η": r"\eta ",
+    "ι": r"\iota ",
+    "κ": r"\kappa ",
+    "ν": r"\nu ",
+    "ξ": r"\xi ",
+    "ρ": r"\rho ",
+    "σ": r"\sigma ",
+    "τ": r"\tau ",
+    "υ": r"\upsilon ",
+    "χ": r"\chi ",
+    "ψ": r"\psi ",
+    "ζ": r"\zeta ",
+    "Θ": r"\Theta ",
+    "Γ": r"\Gamma ",
+    "Π": r"\Pi ",
+    "Υ": r"\Upsilon ",
+    "Ψ": r"\Psi ",
+    "Ω": r"\Omega ",
+    "Λ": r"\Lambda ",
+    "Ξ": r"\Xi ",
+    "Φ": r"\Phi ",
+    # original Greek letters kept for back-compat
     "θ": r"\theta ",
     "α": r"\alpha ",
     "β": r"\beta ",
@@ -194,7 +249,7 @@ _SYM_TO_LATEX = {
     # Unicode subscripts → _{n}
     "₀": "_{0}", "₁": "_{1}", "₂": "_{2}", "₃": "_{3}", "₄": "_{4}",
     "₅": "_{5}", "₆": "_{6}", "₇": "_{7}", "₈": "_{8}", "₉": "_{9}",
-    # Unicode superscripts → ^{n}
+    # Unicode superscripts → ^{n}  (¹ ² ³ come from the main maps above)
     "⁰": "^{0}", "⁴": "^{4}", "⁵": "^{5}", "⁶": "^{6}", "⁷": "^{7}",
     "⁸": "^{8}", "⁹": "^{9}",
 }
@@ -253,11 +308,20 @@ def _convert_math_segment(seg: str) -> str:
     """Convert a raw math segment (no Chinese) to LaTeX math-mode content.
 
     Handles symbol replacement, sqrt{} fixing, S△ABC → S_{\\triangle ABC},
-    simple fractions a/b → \\frac{a}{b}, and cleanup of extra spaces.
+    simple fractions a/b → \\frac{a}{b}, minus-sign placement for negative
+    fractions, redundant-paren stripping, and cleanup of extra spaces.
     """
     out = seg
+    # ---- Pre-pass: multi-char Unicode idioms before single-char mapping ----
+    out = re.sub(r"⁻¹", r"^{-1}", out)                    # sin⁻¹x
+    out = re.sub(r"⌒\s*([A-Z]{1,4})", r"\\overset{\\frown}{\1}", out)  # ⌒AB
+    out = out.replace("（", "(").replace("）", ")")         # full-width parens
+    out = out.replace("，", ",").replace("∶", ":")         # full-width punct
+
     for sym, cmd in _SYM_TO_LATEX.items():
         out = out.replace(sym, cmd)
+    # Units: cm² → \mathrm{cm}^2 (also dm/mm/km)
+    out = re.sub(r"(?<![A-Za-z])(cm|dm|mm|km|min)\^\{?(\d+)\}?", r"\\mathrm{\1}^{\2}", out)
     # \sqrt followed by (expr) → \sqrt{expr}  (match BALANCED parens, support nesting)
     out = _fix_sqrt_parens(out)
     # \sqrt followed by digit/letter → \sqrt{...}
@@ -284,32 +348,71 @@ def _convert_math_segment(seg: str) -> str:
     # sqrt(number) without braces → sqrt{number}
     out = re.sub(r"\\sqrt\s*(\d+)", r"\\sqrt{\1}", out)
 
+    # ---- Superscript / subscript normalization ----
+    # x^2 → x^{2}, x_1 → x_{1}  (braced form is robust), then merge
+    # consecutive groups: x²³ → x^{23}, x₁₂ → x_{12}  (never x^2^3 which is invalid).
+    out = re.sub(r"\^(\d+)", r"^{\1}", out)
+    out = re.sub(r"_(\d+)", r"_{\1}", out)
+    for _ in range(3):
+        new = re.sub(r"\^\{(\d+)\}\^\{(\d+)\}", r"^{\1\2}", out)
+        new = re.sub(r"_\{(\d+)\}_\{(\d+)\}", r"_{\1\2}", new)
+        if new == out:
+            break
+        out = new
+
     # ---- Fraction conversion ----
     # Convert A/B patterns to \frac{A}{B} for various token types.
     # A "frac token" is one of (tried longest-first):
-    #   N\sqrt{..}\^?digit?   (e.g. 2\sqrt{5}, 2\sqrt{5}^2)
-    #   \sqrt{..}\^?digit?    (e.g. \sqrt{35})
-    #   (expr)                (e.g. (\sqrt{5}) or (x_{1}+x_{2}))
-    #   letters\^digit        (e.g. x^2, AE^2)
-    #   letters_\{..\}        (e.g. S_{1}, x_{1})
-    #   letters\d*            (e.g. AB, CE, a, 2ab — but leading digit only if followed by letter)
-    #   -?digits              (e.g. 35, -5)
+    #   N\sqrt{..}^d?          (e.g. 2\sqrt{5}, 2\sqrt{5}^2)
+    #   \sqrt{..}^d?           (e.g. \sqrt{35})
+    #   (balanced expr)^d?     (e.g. (x_{1}+x_{2}), (a+b)^2 — one level of nesting)
+    #   letters^d              (e.g. x^2, AE^2)
+    #   letters_{..}           (e.g. S_{1}, x_{1})
+    #   letters\d*             (e.g. AB, CE, a, 2ab)
+    #   -?digits               (e.g. 35, -5)
+    _exp = r"(?:\^\{?\d+\}?)?"
+    _paren = r"(?:\((?:[^()]|\([^()]*\))*\))+"
     _frac_token = (
         r"(?:"
-        r"\d*\\sqrt\{[^}]+\}(?:\^\d+)?"   # 2\sqrt{5}, \sqrt{35}^2
-        r"|\\sqrt\{[^}]+\}(?:\^\d+)?"      # \sqrt{35}
-        r"|\([^)]*\)"                       # (expr)
-        r"|[A-Za-z]{1,4}(?:\^\d+)"         # x^2, AE^2
-        r"|[A-Za-z]_\{[^}]+\}"             # S_{1}, x_{1}
-        r"|[A-Za-z]{1,4}\d*"               # AB, CE, a
-        r"|-?\d+"                           # 35, -5
-        r")"
+        + r"\d*\\sqrt\{[^}]+\}" + _exp
+        + r"|\\sqrt\{[^}]+\}" + _exp
+        + r"|" + _paren + _exp
+        + r"|[A-Za-z]{1,4}(?:\^\{?\d+\}?)"
+        + r"|[A-Za-z]_\{[^}]+\}"
+        + r"|[A-Za-z]{1,4}\d*"
+        + r"|\d+[A-Za-z]{1,4}"
+        + r"|-?\d+"
+        + r")"
     )
     out = re.sub(
         r"(?<![_^a-zA-Z])(" + _frac_token + r")\s*/\s*(" + _frac_token + r")",
         r"\\frac{\1}{\2}",
         out,
     )
+    # Strip redundant parens that wrap a whole fraction part — only when the
+    # content has no parens of its own, so (a+b)(c+d) is never damaged.
+    out = re.sub(r"\\frac\{\(([^()]*)\)\}\{\(([^()]*)\)\}", r"\\frac{\1}{\2}", out)
+    out = re.sub(r"\\frac\{\(([^()]*)\)\}\{([^{}]*)\}", r"\\frac{\1}{\2}", out)
+    out = re.sub(r"\\frac\{([^{}]*)\}\{\(([^()]*)\)\}", r"\\frac{\1}{\2}", out)
+    # Move the minus of a negative fraction in front of the whole fraction:
+    # \frac{-1}{2} → -\frac{1}{2},  \frac{3}{-2} → -\frac{3}{2}.
+    _neg_frac = r"\\frac\{(-?(?:[^{}]|\{[^{}]*\})*)\}\{(-?(?:[^{}]|\{[^{}]*\})*)\}"
+    for _ in range(3):
+        def _fix_sign(m):
+            num, den = m.group(1), m.group(2)
+            neg_num, neg_den = num.startswith("-"), den.startswith("-")
+            if neg_num:
+                num = num[1:]
+            if neg_den:
+                den = den[1:]
+            return ("-" if neg_num != neg_den else "") + f"\\frac{{{num}}}{{{den}}}"
+        new = re.sub(_neg_frac, _fix_sign, out)
+        if new == out:
+            break
+        out = new
+    # After sign extraction, \frac{-(x+1)}{2} → -\frac{x+1}{2}
+    out = re.sub(r"\\frac\{\(([^()]*)\)\}\{([^{}]*)\}", r"\\frac{\1}{\2}", out)
+
     # Collapse multiple spaces inside math
     out = re.sub(r"  +", " ", out)
     # Remove spaces right after ^ or _ (e.g. "^ 2" → "^2")
@@ -512,6 +615,16 @@ def _preamble(title: str) -> list[str]:
         r"\usepackage{enumitem}",
         r"\usepackage{tcolorbox}",
         r"\tcbuselibrary{skins}",
+        r"\usepackage{titlesec}",
+        r"\titleformat{\section}{\Large\bfseries}{}{0em}{}",
+        r"\titlespacing*{\section}{0pt}{1.4em}{0.7em}",
+        r"\usepackage{fancyhdr}",
+        r"\pagestyle{fancy}",
+        r"\fancyhf{}",
+        r"\fancyfoot[C]{\small 第 \thepage\ 页}",
+        r"\renewcommand{\headrulewidth}{0pt}",
+        r"\allowdisplaybreaks",
+        r"\usepackage[colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!60!black, bookmarksnumbered=true]{hyperref}",
         r"\onehalfspacing",
         r"\setlength{\parskip}{4pt}",
         r"\setlength{\parindent}{2em}",

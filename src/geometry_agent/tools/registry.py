@@ -28,6 +28,7 @@ from geometry_agent.tools.geometry_prover import (
 from geometry_agent.tools import polynomial_tools as _poly
 from geometry_agent.tools import conic_tools as _conic
 from geometry_agent.tools import function_tools as _func
+from geometry_agent.tools import algebra_tools as _algebra
 
 # Re-export the existing schema list so callers can reach it from one place.
 from geometry_agent.reasoning.tools import TOOL_SCHEMAS as _EXISTING_TOOL_SCHEMAS
@@ -543,6 +544,192 @@ _CODE_TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    # ------------------------------------------------------------------ #
+    # General algebra tools (v2)
+    # ------------------------------------------------------------------ #
+    {
+        "type": "function",
+        "function": {
+            "name": "solve_equation",
+            "description": "解方程(任意类型: 多项式/三角/指数/对数): 求 f(x)=0 的根. 参数: equation(方程左端=0), variable(未知量, 默认x), domain(可选: R 或 (0,oo) 等区间过滤).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "equation": {"type": "string", "description": "方程左端, 如 x**2-4 或 sin(x)-1/2"},
+                    "variable": {"type": "string", "default": "x"},
+                    "domain": {"type": "string", "default": "R"},
+                    "variables": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["equation"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "solve_inequality",
+            "description": "解一元不等式, 返回解集区间. 参数: inequality(如 x**2-4>0), variable.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "inequality": {"type": "string"},
+                    "variable": {"type": "string", "default": "x"},
+                    "variables": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["inequality"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "verify_identity",
+            "description": "符号验证恒等式 left=right 是否成立 (化简差值为0则真). 推理链安全网: 任何化简/等式结论都应调用本工具确认. 参数: left, right, variables.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "left": {"type": "string", "description": "等式左边, 如 (x+1)**2"},
+                    "right": {"type": "string", "description": "等式右边, 如 x**2+2*x+1"},
+                    "variables": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["left", "right"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rationalize",
+            "description": "分母有理化: 1/(√2+1) → √2-1. 参数: expression.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expression": {"type": "string"},
+                    "variables": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["expression"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "simplify_trig",
+            "description": "三角恒等变换化简, 如 sin(x)**2+cos(x)**2 → 1. 参数: expression.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expression": {"type": "string"},
+                    "variables": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["expression"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "distance_two_points",
+            "description": "两点间距离(精确): d=√[(x1-x2)²+(y1-y2)²]. 参数: point1, point2 (格式 'x,y' 或 '[x, y]').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "point1": {"type": "string", "description": "如 '1,1'"},
+                    "point2": {"type": "string", "description": "如 '3,5'"},
+                },
+                "required": ["point1", "point2"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "midpoint_formula",
+            "description": "中点坐标: ((x1+x2)/2, (y1+y2)/2). 参数: point1, point2.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "point1": {"type": "string"},
+                    "point2": {"type": "string"},
+                },
+                "required": ["point1", "point2"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "line_equation",
+            "description": "过两点的直线方程(一般式 Ax+By+C=0). 参数: point1, point2.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "point1": {"type": "string"},
+                    "point2": {"type": "string"},
+                },
+                "required": ["point1", "point2"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "collinear_check",
+            "description": "三点共线判定(叉积=0). 参数: point1, point2, point3.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "point1": {"type": "string"},
+                    "point2": {"type": "string"},
+                    "point3": {"type": "string"},
+                },
+                "required": ["point1", "point2", "point3"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "angle_between_lines",
+            "description": "两直线夹角: tanθ=|(k2-k1)/(1+k1k2)|. 参数: slope1, slope2 (斜率, 可用分数).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "slope1": {"type": "string", "description": "如 1/2"},
+                    "slope2": {"type": "string", "description": "如 -2"},
+                },
+                "required": ["slope1", "slope2"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "matrix_det",
+            "description": "方阵行列式(精确), 用于共线/面积/坐标变换验证. 参数: matrix (n×n 字符串方阵).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "matrix": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}},
+                },
+                "required": ["matrix"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "matrix_inverse",
+            "description": "方阵求逆(精确). 参数: matrix.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "matrix": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}},
+                },
+                "required": ["matrix"],
+            },
+        },
+    },
 ]
 
 
@@ -618,6 +805,9 @@ def get_tool_dispatchers(
         dispatchers[_name] = _make_structured(_fn)
     # Register function tools
     for _name, _fn in _func.TOOL_FUNCTIONS.items():
+        dispatchers[_name] = _make_structured(_fn)
+    # Register algebra tools
+    for _name, _fn in _algebra.TOOL_FUNCTIONS.items():
         dispatchers[_name] = _make_structured(_fn)
 
     for name, fn in tools_dict.items():

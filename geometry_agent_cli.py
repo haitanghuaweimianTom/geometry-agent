@@ -30,7 +30,12 @@ if _src.exists():
 from geometry_agent.config import load_settings
 from geometry_agent.pipeline import GeometryPipeline
 from geometry_agent.types import GradeLevel, Solution, SolveRequest, ToolCall
-from geometry_agent.human_loop.pdf_compiler import solution_to_pdf, multi_question_to_pdf
+from geometry_agent.human_loop.pdf_compiler import (
+    PDFCompileError,
+    multi_question_to_pdf,
+    solution_to_pdf,
+)
+from geometry_agent.normalize import normalize_problem_text
 
 
 def _numeric_verify_fixed_point(problem_text: str, answer_text: str, tools: dict) -> bool:
@@ -133,9 +138,21 @@ def _extract_answer(plan) -> Solution:
     return sol
 
 
+def _render_pdf(maker, desc: str, *pdf_args):
+    """Compile a PDF via ``maker``, printing a friendly hint on failure."""
+    try:
+        return maker(*pdf_args)
+    except PDFCompileError as e:
+        print(f"  ⚠️ {desc} 生成失败: {e}")
+        print("  💡 提示: 需要安装 xelatex 才能生成 PDF "
+              "(Ubuntu: sudo apt install texlive-xetex texlive-lang-chinese)")
+        return None
+
+
 def cmd_solve(args):
     """Solve a single problem."""
     grade = _grade_from_str(args.grade)
+    args.text = normalize_problem_text(args.text)
     s = _load_settings(args.config)
     s.human_loop.enabled = False
     s.llm.max_tool_calls = args.max_calls
@@ -189,14 +206,17 @@ def cmd_solve(args):
         print()
 
     pdf_name = args.out or f"outputs/解答_{int(time.time())}.pdf"
-    pdf_path = solution_to_pdf(args.text, sol, None, pdf_name, "几何题解答报告")
-    print(f"  PDF 已保存: {pdf_path}")
+    pdf_path = _render_pdf(solution_to_pdf, "PDF", args.text, sol, None, pdf_name, "几何题解答报告")
+    if pdf_path:
+        print(f"  PDF 已保存: {pdf_path}")
     return sol
 
 
 def cmd_multi(args):
     """Solve a multi-sub-question problem."""
     grade = _grade_from_str(args.grade)
+    args.text = normalize_problem_text(args.text)
+    args.subs = [normalize_problem_text(s) for s in args.subs]
     s = _load_settings(args.config)
     s.human_loop.enabled = False
     s.llm.max_tool_calls = args.max_calls
@@ -242,8 +262,9 @@ def cmd_multi(args):
     print()
 
     pdf_name = args.out or f"outputs/解答_多题_{int(time.time())}.pdf"
-    pdf_path = multi_question_to_pdf(args.text, results, None, pdf_name, "几何题解答报告")
-    print(f"  PDF 已保存: {pdf_path}")
+    pdf_path = _render_pdf(multi_question_to_pdf, "PDF", args.text, results, None, pdf_name, "几何题解答报告")
+    if pdf_path:
+        print(f"  PDF 已保存: {pdf_path}")
     return results
 
 
@@ -272,7 +293,7 @@ def cmd_interactive(args):
     while True:
         print("─" * 60)
         print("请输入题目 (输入 q 退出, m 切换单题/多题模式):")
-        text = input("> ").strip()
+        text = normalize_problem_text(input("> ").strip())
         if text.lower() == "q":
             print("再见!")
             break
@@ -284,53 +305,59 @@ def cmd_interactive(args):
         if not text or text.lower() == "m":
             continue
 
-        if mode == "2":
-            # Multi-sub-question mode
-            subs = []
-            i = 1
-            while True:
-                sub = input(f"  输入第{i}小题 (空行结束): ").strip()
-                if not sub:
-                    break
-                subs.append(sub)
-                i += 1
-            if not subs:
-                print("  未输入小题, 跳过")
-                continue
-            print(f"\n  共 {len(subs)} 小题, 开始求解...\n")
-            agent = p._agent_for_grade(grade)
-            tools = p._tools(None) if hasattr(p, '_tools') else {}
-            results = []
-            for i, sub_text in enumerate(subs):
-                label = f"({i+1})"
-                t0 = time.time()
-                plan = agent.reason("", text + " " + sub_text, tools)
-                sol = _extract_answer(plan)
-                print(f"  {label} ({time.time()-t0:.0f}s) 答案={sol.answer[:50]}")
-                results.append({"label": label, "question": sub_text, "solution": sol})
-            pdf_path = multi_question_to_pdf(text, results, None,
-                                              f"outputs/解答_{int(time.time())}.pdf",
-                                              "几何题解答报告")
-            print(f"\n  PDF: {pdf_path}\n")
-        else:
-            # Single question mode
-            print("\n  开始求解...\n")
-            agent = p._agent_for_grade(grade)
-            tools = p._tools(None) if hasattr(p, '_tools') else {}
-            t0 = time.time()
-            plan = agent.reason("", text, tools)
-            sol = _extract_answer(plan)
-            print(f"  耗时: {time.time()-t0:.1f}s | 步数: {len(sol.proof)} | 置信度: {sol.confidence:.2f}")
-            print(f"  答案: {sol.answer}")
-            show = input("\n  显示步骤? [y/N]: ").strip()
-            if show.lower() == "y":
-                for st in sol.proof:
-                    mark = "✓" if st.verified else "○"
-                    print(f"    [{mark}] {st.statement[:80]}")
-            pdf_path = solution_to_pdf(text, sol, None,
+        try:
+            if mode == "2":
+                # Multi-sub-question mode
+                subs = []
+                i = 1
+                while True:
+                    sub = normalize_problem_text(input(f"  输入第{i}小题 (空行结束): ").strip())
+                    if not sub:
+                        break
+                    subs.append(sub)
+                    i += 1
+                if not subs:
+                    print("  未输入小题, 跳过")
+                    continue
+                print(f"\n  共 {len(subs)} 小题, 开始求解...\n")
+                agent = p._agent_for_grade(grade)
+                tools = p._tools(None) if hasattr(p, '_tools') else {}
+                results = []
+                for i, sub_text in enumerate(subs):
+                    label = f"({i+1})"
+                    t0 = time.time()
+                    plan = agent.reason("", text + " " + sub_text, tools)
+                    sol = _extract_answer(plan)
+                    print(f"  {label} ({time.time()-t0:.0f}s) 答案={sol.answer[:50]}")
+                    results.append({"label": label, "question": sub_text, "solution": sol})
+                pdf_path = _render_pdf(multi_question_to_pdf, "PDF", text, results, None,
                                        f"outputs/解答_{int(time.time())}.pdf",
                                        "几何题解答报告")
-            print(f"\n  PDF: {pdf_path}\n")
+                if pdf_path:
+                    print(f"\n  PDF: {pdf_path}\n")
+            else:
+                # Single question mode
+                print("\n  开始求解...\n")
+                agent = p._agent_for_grade(grade)
+                tools = p._tools(None) if hasattr(p, '_tools') else {}
+                t0 = time.time()
+                plan = agent.reason("", text, tools)
+                sol = _extract_answer(plan)
+                print(f"  耗时: {time.time()-t0:.1f}s | 步数: {len(sol.proof)} | 置信度: {sol.confidence:.2f}")
+                print(f"  答案: {sol.answer}")
+                show = input("\n  显示步骤? [y/N]: ").strip()
+                if show.lower() == "y":
+                    for st in sol.proof:
+                        mark = "✓" if st.verified else "○"
+                        print(f"    [{mark}] {st.statement[:80]}")
+                pdf_path = _render_pdf(solution_to_pdf, "PDF", text, sol, None,
+                                       f"outputs/解答_{int(time.time())}.pdf",
+                                       "几何题解答报告")
+                if pdf_path:
+                    print(f"\n  PDF: {pdf_path}\n")
+        except KeyboardInterrupt:
+            print("\n  (已中断, 返回输入)")
+            continue
 
 
 def main():
@@ -381,7 +408,11 @@ def main():
     p3.set_defaults(func=cmd_interactive)
 
     args = ap.parse_args()
-    args.func(args)
+    try:
+        args.func(args)
+    except KeyboardInterrupt:
+        print("\n\n已中断 (Ctrl+C)。再见!")
+        sys.exit(130)
 
 
 if __name__ == "__main__":

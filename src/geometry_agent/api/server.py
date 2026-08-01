@@ -25,6 +25,7 @@ from geometry_agent.human_loop.pdf_compiler import (
     multi_question_to_pdf,
     solution_to_pdf,
 )
+from geometry_agent.normalize import normalize_problem_text
 from geometry_agent.pipeline import GeometryPipeline
 from geometry_agent.reasoning.enhanced_agent import EnhancedReasoningAgent
 from geometry_agent.reasoning.experience import ExperienceMemory
@@ -146,6 +147,7 @@ def health():
 
 @app.post("/api/solve")
 def solve(req: SolveRequest):
+    req.text = normalize_problem_text(req.text)
     if not req.text.strip():
         raise HTTPException(400, "题目文本不能为空")
     grade = _grade(req.grade)
@@ -170,6 +172,7 @@ def solve(req: SolveRequest):
 
 @app.post("/api/solve-multi")
 def solve_multi(req: SolveMultiRequest):
+    req.text = normalize_problem_text(req.text)
     if not req.text.strip():
         raise HTTPException(400, "题干不能为空")
     if not req.subs:
@@ -180,6 +183,7 @@ def solve_multi(req: SolveMultiRequest):
     tools = p._tools(None) if hasattr(p, "_tools") else {}
     results = []
     for i, sub_text in enumerate(req.subs):
+        sub_text = normalize_problem_text(sub_text)
         full_text = req.text + " " + sub_text
         res = _solve_one(full_text, grade, s, p, tools, req.max_calls)
         sol = res["solution"]

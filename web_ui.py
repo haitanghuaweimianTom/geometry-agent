@@ -28,6 +28,10 @@ from geometry_agent.config import load_settings
 from geometry_agent.pipeline import GeometryPipeline
 from geometry_agent.types import GradeLevel, Solution
 from geometry_agent.human_loop.pdf_compiler import solution_to_pdf, multi_question_to_pdf
+from geometry_agent.normalize import normalize_problem_text
+from geometry_agent.reasoning.enhanced_agent import EnhancedReasoningAgent
+from geometry_agent.reasoning.experience import ExperienceMemory
+from geometry_agent_cli import _numeric_verify_fixed_point
 
 # Global pipeline instance (reused across requests)
 _pipeline = None
@@ -69,22 +73,44 @@ def extract_answer(plan) -> Solution:
 
 def solve_single(problem_text, grade_str, show_steps):
     """Solve a single problem."""
+    problem_text = normalize_problem_text(problem_text)
     if not problem_text.strip():
-        return "请输入题目文本", None, ""
+        return "请输入题目文本", None
 
     grade_map = {"初中": GradeLevel.JUNIOR, "高中": GradeLevel.SENIOR, "竞赛": GradeLevel.COMPETITION}
     grade = grade_map.get(grade_str, GradeLevel.SENIOR)
 
     p = get_pipeline()
-    agent = p._agent_for_grade(grade)
     tools = p._tools(None) if hasattr(p, "_tools") else {}
 
     t0 = time.time()
-    plan = agent.reason("", problem_text, tools)
-    sol = extract_answer(plan)
+    sol = None
+    retry_log = []
+    try:
+        for attempt in range(3):
+            agent = EnhancedReasoningAgent(
+                p.settings.llm, tools={},
+                knowledge_manager=p.knowledge_manager,
+                grade=grade,
+                experience_memory=ExperienceMemory(),
+            )
+            plan = agent.reason("", problem_text, tools)
+            sol = extract_answer(plan)
+            good = sol.confidence >= 0.5 and len(sol.proof) >= 2
+            if good and ("定点" in problem_text or "过定点" in problem_text or "恒过" in problem_text):
+                good = _numeric_verify_fixed_point(problem_text, sol.answer, tools)
+            if good:
+                break
+            if attempt < 2:
+                reason = "置信度低" if sol.confidence < 0.5 else "数值校验失败"
+                retry_log.append(f"- {reason}, 已重试 {attempt+2}/3")
+    except Exception as e:
+        return f"## ❌ 求解失败\n\n题目解析或推理出错，请检查题目表述后重试。\n\n> 错误信息: {e}", None
     elapsed = time.time() - t0
 
-    # Build result text
+    if sol is None:
+        return "## ❌ 求解失败\n\n多次尝试后仍无法给出可靠解答，请检查题目表述。", None
+
     lines = [
         f"## 解题结果\n",
         f"- 耗时: {elapsed:.1f} 秒",
@@ -92,6 +118,10 @@ def solve_single(problem_text, grade_str, show_steps):
         f"- 置信度: {sol.confidence:.2f}",
         f"- **答案: {sol.answer}**\n",
     ]
+    if retry_log:
+        lines.append("**重试记录**")
+        lines.extend(retry_log)
+        lines.append("")
 
     if show_steps and sol.proof:
         lines.append("### 解题步骤\n")
@@ -104,24 +134,27 @@ def solve_single(problem_text, grade_str, show_steps):
 
     result_text = "\n".join(lines)
 
-    # Generate PDF
-    out_dir = Path("outputs")
-    out_dir.mkdir(exist_ok=True)
-    pdf_path = solution_to_pdf(
-        problem_text, sol, None,
-        str(out_dir / f"解答_{int(time.time())}.pdf"),
-        "几何题解答报告",
-    )
+    try:
+        out_dir = Path("outputs")
+        out_dir.mkdir(exist_ok=True)
+        pdf_path = solution_to_pdf(
+            problem_text, sol, None,
+            str(out_dir / f"解答_{int(time.time())}.pdf"),
+            "几何题解答报告",
+        )
+    except Exception as e:
+        return result_text + f"\n\n## ⚠️ PDF 生成失败\n\n> {e}", None
 
-    return result_text, pdf_path, ""
+    return result_text, pdf_path
 
 
 def solve_multi(problem_text, sub_questions_text, grade_str):
     """Solve a multi-sub-question problem."""
+    problem_text = normalize_problem_text(problem_text)
     if not problem_text.strip():
         return "请输入题干", None
 
-    subs = [s.strip() for s in sub_questions_text.strip().split("\n") if s.strip()]
+    subs = [normalize_problem_text(s.strip()) for s in sub_questions_text.strip().split("\n") if s.strip()]
     if not subs:
         return "请输入至少一个小题", None
 
@@ -129,7 +162,6 @@ def solve_multi(problem_text, sub_questions_text, grade_str):
     grade = grade_map.get(grade_str, GradeLevel.SENIOR)
 
     p = get_pipeline()
-    agent = p._agent_for_grade(grade)
     tools = p._tools(None) if hasattr(p, "_tools") else {}
 
     results = []
@@ -137,9 +169,25 @@ def solve_multi(problem_text, sub_questions_text, grade_str):
 
     for i, sub_text in enumerate(subs):
         label = f"({i+1})"
+        full_text = problem_text + " " + sub_text
         t0 = time.time()
-        plan = agent.reason("", problem_text + " " + sub_text, tools)
-        sol = extract_answer(plan)
+        sol = None
+        try:
+            for attempt in range(3):
+                agent = EnhancedReasoningAgent(
+                    p.settings.llm, tools={},
+                    knowledge_manager=p.knowledge_manager,
+                    grade=grade,
+                    experience_memory=ExperienceMemory(),
+                )
+                plan = agent.reason("", full_text, tools)
+                sol = extract_answer(plan)
+                if sol.confidence >= 0.5 and len(sol.proof) >= 2:
+                    break
+        except Exception as e:
+            lines.append(f"### {label} {sub_text}")
+            lines.append(f"- ❌ 求解出错: {e}\n")
+            continue
         elapsed = time.time() - t0
         lines.append(f"### {label} {sub_text}")
         lines.append(f"- 耗时: {elapsed:.0f}s | 步数: {len(sol.proof)} | 置信度: {sol.confidence:.2f}")
@@ -148,13 +196,19 @@ def solve_multi(problem_text, sub_questions_text, grade_str):
 
     result_text = "\n".join(lines)
 
-    out_dir = Path("outputs")
-    out_dir.mkdir(exist_ok=True)
-    pdf_path = multi_question_to_pdf(
-        problem_text, results, None,
-        str(out_dir / f"解答_{int(time.time())}.pdf"),
-        "几何题解答报告",
-    )
+    if not results:
+        return result_text + "\n## ❌ 所有小题均求解失败", None
+
+    try:
+        out_dir = Path("outputs")
+        out_dir.mkdir(exist_ok=True)
+        pdf_path = multi_question_to_pdf(
+            problem_text, results, None,
+            str(out_dir / f"解答_{int(time.time())}.pdf"),
+            "几何题解答报告",
+        )
+    except Exception as e:
+        return result_text + f"\n\n## ⚠️ PDF 生成失败\n\n> {e}", None
 
     return result_text, pdf_path
 
