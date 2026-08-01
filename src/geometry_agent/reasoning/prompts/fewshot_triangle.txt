@@ -1,0 +1,18 @@
+# Few-shot Example: Triangle solving — cosine theorem (余弦定理)
+
+Problem: 在 △ABC 中, 已知 b=8, c=6, ∠A=60°, 用余弦定理求边 a.
+Goal: Solve 求边 a 的长度.
+
+Reasoning trace (课内方法: 余弦定理; 计算用 solve, 不手算):
+- Step 1: recall the cosine theorem (课内方法): a² = b² + c² - 2bc·cos(A).
+- Step 2: substitute known values b=8, c=6, A=60° and solve via the solve tool.
+  → call solve(equations=["a^2 = 8^2 + 6^2 - 2*8*6*cos(60)"], goal="a = 2*sqrt(13)")
+  ← {"verified":true,"solution":{"a":"2*sqrt(13)"},"reason":"a²=64+36-48=52, a=2√13"}
+- Step 3: cross-check the numeric value via execute_code (sympy).
+  → call execute_code(code="import sympy as sp\na = sp.sqrt(8**2 + 6**2 - 2*8*6*sp.cos(sp.pi/3))\nprint('a=', sp.simplify(a))")
+  ← {"success":true,"output":"a= 2*sqrt(13)","value":null}
+
+Final JSON output:
+```json
+{"plan":[{"step":1,"statement":"由余弦定理 a²=b²+c²-2bc·cosA","reason":"课内方法: 余弦定理 (推荐优先尝试)","verified":true},{"step":2,"statement":"代入 b=8,c=6,A=60° 得 a²=52, a=2√13","reason":"solve 工具求解, 不手算","verified":true,"tool_call":{"name":"solve","args":{"equations":["a^2=8^2+6^2-2*8*6*cos(60)"],"goal":"a=2*sqrt(13)"}}},{"step":3,"statement":"a=2√13 数值验证通过","reason":"execute_code (sympy) 交叉检验","verified":true,"tool_call":{"name":"execute_code","args":{"code":"sp.sqrt(52)=2*sqrt(13)"}}}],"goal":{"kind":"Solve","statement":"求边 a 的长度"}}
+```

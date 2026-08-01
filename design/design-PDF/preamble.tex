@@ -1,0 +1,48 @@
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\setmainfont{Noto Serif CJK SC}
+\setsansfont{Noto Sans CJK SC}
+\setmonofont{Noto Sans Mono CJK SC}[Scale=0.85]
+% 为等宽字体补充符号回退, 覆盖下标/勾叉等 Unicode 符号
+\setCJKmonofont{Noto Sans Mono CJK SC}[Scale=0.85]
+\usepackage{newunicodechar}
+\newfontfamily{\symfont}{DejaVu Sans}[Scale=0.85]
+\newunicodechar{₀}{{\symfont ₀}}
+\newunicodechar{₁}{{\symfont ₁}}
+\newunicodechar{₂}{{\symfont ₂}}
+\newunicodechar{✓}{{\symfont ✓}}
+\newunicodechar{✗}{{\symfont ✗}}
+\usepackage{geometry}
+\geometry{a4paper, margin=2.2cm}
+\usepackage{xcolor}
+\usepackage{mdframed}
+\usepackage{fancyvrb}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, bookmarksopen=true}
+\usepackage{booktabs}
+\usepackage{longtable}
+
+% 行距
+\usepackage{setspace}
+\onehalfspacing
+
+% 代码块样式
+\definecolor{codebg}{rgb}{0.96,0.96,0.96}
+\definecolor{codeframe}{rgb}{0.8,0.8,0.8}
+\newmdenv[
+  linecolor=codeframe,
+  linewidth=0.5pt,
+  backgroundcolor=codebg,
+  topline=true, bottomline=true, leftline=true, rightline=true,
+  innertopmargin=4pt, innerbottommargin=4pt, innerleftmargin=6pt, innerrightmargin=6pt,
+  skipabove=6pt, skipbelow=6pt
+]{codobox}
+
+% 标题样式
+\titleformat{\section}{\Large\bfseries\sffamily}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\sffamily}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+
+\setlength{\parskip}{4pt}
+\setlength{\parindent}{0pt}

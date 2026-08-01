@@ -1,0 +1,93 @@
+# Default configuration for Geometry Agent.
+# Copy this file to configs/default.yaml and fill in your own API key.
+#   cp configs/default.example.yaml configs/default.yaml
+#
+# Alternatively, set environment variables (they override this file):
+#   export LLM_API_KEY="sk-..."
+#   export LLM_BASE_URL="https://api.openai.com/v1"
+#   export LLM_MODEL="gpt-4o"
+
+debug: false
+log_level: INFO
+
+parser:
+  deskew_threshold_deg: 1.0
+  skeleton_method: zhang_suen
+  ocr_enabled: true
+  sam_enabled: false
+  sam_checkpoint: ""
+  yolo_weights: ""
+
+graph:
+  spatial_bucket_px: 40.0
+  relation_parallel_workers: 4
+
+verifier:
+  on_line_abs_tol: 2.0
+  on_line_rel_tol: 0.005
+  on_circle_abs_tol: 2.0
+  on_circle_rel_tol: 0.015
+  perp_angle_tol_deg: 3.0
+  parallel_angle_tol_deg: 3.0
+  tangent_abs_tol: 2.0
+  tangent_rel_tol: 0.015
+  equal_rel_tol: 0.02
+  equal_angle_tol_deg: 2.0
+  ellipse_sum_rel_tol: 0.015
+  collinear_abs_tol: 2.0
+  collinear_rel_tol: 0.005
+  concentric_abs_tol: 2.0
+  concentric_rel_tol: 0.01
+  uncertain_band_mult: 3.0
+
+dsl:
+  include_uncertain: false
+  compact: false
+
+llm:
+  # Any OpenAI-compatible endpoint. Tested with:
+  #   - GLM (Zhipu)        base_url: https://open.bigmodel.cn/api/paas/v4
+  #   - OpenAI             base_url: https://api.openai.com/v1
+  #   - DeepSeek           base_url: https://api.deepseek.com/v1
+  model: GLM-5.2
+  api_key: ""              # <-- fill in your key, or set LLM_API_KEY env var
+  base_url: "http://your-gateway.example.com/v1"
+  temperature: 0.3
+  max_tokens: 8192
+  max_tool_calls: 60
+  max_reflections: 3
+  voting_n: 1
+  fewshot_dir: prompts/fewshot
+
+solver:
+  sympy_enabled: true
+  z3_enabled: true
+  rule_engine_enabled: true
+  lean_enabled: false
+  theorem_db_path: theorems/theorems.json
+
+human_loop:
+  enabled: true
+  interactive: false
+  out_dir: outputs
+  max_rounds: 5
+  open_pdf: false
+
+knowledge:
+  enabled: true
+  db_path: knowledge/curated.json
+  web_enabled: false        # offline by default; the system never needs internet
+  web_timeout: 15.0
+  min_local_entries: 3
+
+code_exec:
+  enabled: true
+  timeout_sec: 10.0
+  max_output_chars: 2000
+  allow_imports:
+    - math
+    - numpy
+    - sympy
+    - fractions
+    - decimal
+    - statistics

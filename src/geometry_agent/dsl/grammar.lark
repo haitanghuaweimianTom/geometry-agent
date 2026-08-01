@@ -1,0 +1,118 @@
+// Geometry DSL grammar (design/06 §3 EBNF), lark format.
+// Covers: objects (Point/Line/Segment/Ray/Circle/Arc/Ellipse/Polygon/Triangle),
+// relations (On/Collinear/Intersect/Tangent/Parallel/Perpendicular/Equal/Inside/
+// Outside/Concentric/Inscribed/Circumscribed/Similar/Congruent/Center/TangentPoint/
+// Angle/SumDist), goals (Prove/Solve/Find).
+//
+// Whitespace (including newlines) is ignored between tokens; the PROPOSITION
+// terminal excludes newlines so free-form expressions naturally terminate at EOL.
+
+start: section*
+
+section: objects_section | relations_section | goal_section
+
+// ---------- Objects ----------
+objects_section: "Objects:" object_decl*
+object_decl: "-" object_expr
+
+object_expr: point_decl
+           | circle_decl
+           | arc_decl
+           | ellipse_decl
+           | segment_decl
+           | line_decl
+           | ray_decl
+           | polygon_decl
+           | triangle_decl
+
+point_decl: "Point" "(" LABEL ")" (":" coords)?
+segment_decl: "Segment" "(" LABEL ")"
+line_decl: "Line" "(" LABEL ")" ("," point_ref "," point_ref)?
+ray_decl: "Ray" "(" LABEL ")" ("," point_ref "," coords)?
+circle_decl: "Circle" "(" LABEL "," "r=" NUMBER ")"
+arc_decl: "Arc" "(" LABEL ")" ("," point_ref "," point_ref)?
+ellipse_decl: "Ellipse" "(" LABEL "," "c=" coords "," "a=" NUMBER "," "b=" NUMBER "," "theta=" NUMBER ")"
+polygon_decl: "Polygon" "(" LABEL ")" ("," point_ref)*
+triangle_decl: "Triangle" "(" LABEL ")" ("," point_ref "," point_ref "," point_ref)?
+
+coords: "[" NUMBER "," NUMBER "]"
+
+// ---------- Relations ----------
+relations_section: "Relations:" relation_decl*
+relation_decl: "-" relation_expr
+
+relation_expr: on_rel
+             | collinear_rel
+             | intersect_rel
+             | tangent_rel
+             | parallel_rel
+             | perpendicular_rel
+             | equal_rel
+             | inside_rel
+             | outside_rel
+             | concentric_rel
+             | inscribed_rel
+             | circumscribed_rel
+             | similar_rel
+             | congruent_rel
+             | center_rel
+             | tangent_point_rel
+             | angle_rel
+             | sumdist_rel
+
+on_rel: "On" "(" point_ref "," obj_ref ")"
+collinear_rel: "Collinear" "(" point_ref ("," point_ref)+ ")"
+intersect_rel: "Intersect" "(" obj_ref "," obj_ref ")"
+tangent_rel: "Tangent" "(" obj_ref "," obj_ref ("," "at=" point_ref)? ")"
+parallel_rel: "Parallel" "(" obj_ref "," obj_ref ")"
+perpendicular_rel: "Perpendicular" "(" obj_ref "," obj_ref ")"
+equal_rel: "Equal" "(" obj_ref "," obj_ref ")"
+inside_rel: "Inside" "(" point_ref "," obj_ref ")"
+outside_rel: "Outside" "(" point_ref "," obj_ref ")"
+concentric_rel: "Concentric" "(" obj_ref "," obj_ref ")"
+inscribed_rel: "Inscribed" "(" obj_ref "," obj_ref ")"
+circumscribed_rel: "Circumscribed" "(" obj_ref "," obj_ref ")"
+similar_rel: "Similar" "(" obj_ref "," obj_ref ")"
+congruent_rel: "Congruent" "(" obj_ref "," obj_ref ")"
+center_rel: "Center" "(" point_ref "," obj_ref ")"
+tangent_point_rel: "TangentPoint" "(" point_ref "," obj_ref ")"
+angle_rel: "Angle" "(" angle_args ")" "=" angle_val
+angle_args: LABEL | point_ref "," point_ref "," point_ref
+sumdist_rel: "SumDist" "(" point_ref "," point_ref "," point_ref ")" "=" expr_text
+
+angle_val: NUMBER "deg"
+
+obj_ref: obj_call | LABEL
+obj_call: segment_obj | line_obj | ray_obj | circle_obj | arc_obj
+        | ellipse_obj | polygon_obj | triangle_obj
+segment_obj: "Segment" "(" LABEL ")"
+line_obj: "Line" "(" LABEL ")"
+ray_obj: "Ray" "(" LABEL ")"
+circle_obj: "Circle" "(" LABEL ")"
+arc_obj: "Arc" "(" LABEL ")"
+ellipse_obj: "Ellipse" "(" LABEL ")"
+polygon_obj: "Polygon" "(" LABEL ")"
+triangle_obj: "Triangle" "(" LABEL ")"
+?point_ref: LABEL
+
+// ---------- Goal ----------
+goal_section: "Goal:" goal_decl
+goal_decl: "-" goal_expr
+goal_expr: prove_goal | solve_goal | find_goal
+prove_goal: "Prove" ":" expr_text
+solve_goal: "Solve" ":" expr_text
+find_goal: "Find" ":" expr_text
+
+// Free-form expression text: the rest of a line (no newlines, no comments).
+expr_text: PROPOSITION
+
+// ---------- Terminals ----------
+PROPOSITION: /[^#\n][^\n#]*/
+LABEL: /[A-Za-z][A-Za-z0-9_]*/
+NUMBER: /-?[0-9]+(\.[0-9]+)?/
+
+COMMENT: /#[^\n]*/
+
+%import common.WS
+%ignore WS
+%ignore COMMENT

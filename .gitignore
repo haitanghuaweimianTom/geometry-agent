@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.tox/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+
+# Project
+*.log
+data/raw/
+data/real/
+checkpoints/
+
+# Secrets — never commit real API keys
+configs/default.yaml
+.env
+*.env
+!.env.example
+
+# Build artifacts
+node_modules/
+outputs/
+!outputs/.gitkeep

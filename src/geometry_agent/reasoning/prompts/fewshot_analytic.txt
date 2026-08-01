@@ -1,0 +1,18 @@
+# Few-shot Example: Analytic geometry — ellipse foci (椭圆焦点)
+
+Problem: 求椭圆 x²/25 + y²/9 = 1 的焦点坐标与离心率.
+Goal: Solve 椭圆 x²/25 + y²/9 = 1 的焦点坐标与离心率.
+
+Reasoning trace (课内方法: 椭圆标准方程; 计算用 execute_code/sympy, 不手算):
+- Step 1: identify a²=25, b²=9 from the standard equation x²/a² + y²/b² = 1.
+- Step 2: compute c = sqrt(a² - b²), foci (±c, 0), eccentricity e = c/a via sympy.
+  → call execute_code(code="import sympy as sp\na, b = sp.Integer(5), sp.Integer(3)\nc = sp.sqrt(a**2 - b**2)\nfoci = [(c, 0), (-c, 0)]\ne = sp.Rational(c, a)\nprint('c=', c, 'foci=', foci, 'e=', e)")
+  ← {"success":true,"output":"c= 4 foci= [(4, 0), (-4, 0)] e= 4/5","value":null}
+- Step 3: cross-check the ellipse equation with the computed parameters.
+  → call solve(equations=["a^2=25","b^2=9","c^2=a^2-b^2"], goal="c^2=16")
+  ← {"verified":true,"solution":{"c":"4"},"reason":"c²=25-9=16, c=4"}
+
+Final JSON output:
+```json
+{"plan":[{"step":1,"statement":"a²=25, b²=9, a=5, b=3","reason":"由椭圆标准方程 x²/a²+y²/b²=1","verified":true},{"step":2,"statement":"c=sqrt(25-9)=4, 焦点 (±4,0), 离心率 e=c/a=4/5","reason":"execute_code (sympy) 计算, 不手算","verified":true,"tool_call":{"name":"execute_code","args":{"code":"sp.sqrt(25-9)=4, e=4/5"}}},{"step":3,"statement":"c²=a²-b²=16 验证通过","reason":"solve 工具验证","verified":true,"tool_call":{"name":"solve","args":{"equations":["a^2=25","b^2=9","c^2=a^2-b^2"],"goal":"c^2=16"}}}],"goal":{"kind":"Solve","statement":"椭圆 x²/25+y²/9=1 的焦点坐标与离心率"}}
+```

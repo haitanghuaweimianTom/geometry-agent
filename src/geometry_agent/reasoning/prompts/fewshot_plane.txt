@@ -1,0 +1,21 @@
+# Few-shot Example: Plane geometry — tangent property (切线性质定理)
+
+Problem: AB 切圆 O 于点 A, OA 是半径. 求证 OA ⊥ AB.
+Goal: Prove OA ⊥ AB.
+
+Reasoning trace (each claim is verified before use; computation goes through tools):
+- Step 1: claim A lies on circle O (A 是切点, 在圆上).
+  → call verify("On", "A", "C_O")
+  ← {"verified":"true","evidence":"A is on circle O"}
+- Step 2: claim OA is a radius (O 是圆心, A 在圆上 → OA 是半径).
+  → call verify("Center", "O", "C_O")
+  ← {"verified":"true","evidence":"O is center of C_O"}
+- Step 3: compute the dot product OA·AB via coordinates to confirm perpendicularity (不手算).
+  → call execute_code(code="import sympy as sp\nO=sp.Matrix([0,0]); A=sp.Matrix([3,0]); B=sp.Matrix([3,4])\nOA=A-O; AB=B-A\ndot=OA.dot(AB)\nprint('dot=', dot)")
+  ← {"success":true,"output":"dot= 0","value":null}
+- Step 4: dot=0 ⟹ OA ⊥ AB. By the tangent property theorem (切线垂直于过切点的半径), OA ⊥ AB.
+
+Final JSON output:
+```json
+{"plan":[{"step":1,"statement":"A 在圆 O 上","reason":"A 是切点","verified":true,"tool_call":{"name":"verify","args":{"rel":"On","src":"A","dst":"C_O"}}},{"step":2,"statement":"O 是圆心","reason":"圆心定义","verified":true,"tool_call":{"name":"verify","args":{"rel":"Center","src":"O","dst":"C_O"}}},{"step":3,"statement":"OA·AB = 0","reason":"execute_code (sympy) 计算点积为 0","verified":true,"tool_call":{"name":"execute_code","args":{"code":"OA.dot(AB)=0"}}},{"step":4,"statement":"OA ⊥ AB","reason":"切线性质定理: 切线垂直于过切点的半径","verified":true}],"goal":{"kind":"Prove","statement":"OA ⊥ AB"}}
+```

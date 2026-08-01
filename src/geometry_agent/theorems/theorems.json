@@ -1,0 +1,166 @@
+{
+  "theorems": [
+    {
+      "id": "T_inscribed_angle",
+      "name": "圆周角定理",
+      "premise": ["On(A,Circle(O))", "On(B,Circle(O))", "On(C,Circle(O))", "On(D,Circle(O))", "SameArc(AB,CD)"],
+      "conclusion": "Equal(Angle(ACB), Angle(ADB))",
+      "condition": "A,B,C,D 共圆且 AB,CD 同弧",
+      "category": "circle",
+      "reference": "人教版九年级上册 §24.1"
+    },
+    {
+      "id": "T_central_angle",
+      "name": "圆心角定理",
+      "premise": ["On(A,Circle(O))", "On(B,Circle(O))", "Center(O,Circle)"],
+      "conclusion": "Equal(Angle(AOB), 2*Angle(ACB))",
+      "condition": "C 为同弧上任意圆周角",
+      "category": "circle",
+      "reference": "人教版九年级上册 §24.1"
+    },
+    {
+      "id": "T_tangent_radius",
+      "name": "切线性质定理",
+      "premise": ["Tangent(Line(AB),Circle(O),at=A)", "On(A,Circle(O))"],
+      "conclusion": "Perpendicular(OA,AB)",
+      "condition": "AB 切圆 O 于点 A",
+      "category": "circle",
+      "reference": "人教版九年级上册 §24.2"
+    },
+    {
+      "id": "T_tangent_length",
+      "name": "切线长定理",
+      "premise": ["Tangent(Line(PA),Circle(O),at=A)", "Tangent(Line(PB),Circle(O),at=B)"],
+      "conclusion": "Equal(PA,PB) && Equal(Angle(APO),Angle(BPO))",
+      "condition": "从圆外一点 P 引圆 O 的两条切线",
+      "category": "circle",
+      "reference": "人教版九年级上册 §24.2"
+    },
+    {
+      "id": "T_chord_perp_bisect",
+      "name": "垂径定理",
+      "premise": ["On(A,Circle(O))", "On(B,Circle(O))", "Perpendicular(OM,AB)", "On(M,AB)"],
+      "conclusion": "Equal(AM,BM) && Equal(Arc(AM),Arc(BM))",
+      "condition": "O 为圆心, OM⊥AB 于 M",
+      "category": "circle",
+      "reference": "人教版九年级上册 §24.1"
+    },
+    {
+      "id": "T_similar_sss",
+      "name": "相似三角形 SSS 判定",
+      "premise": ["Equal(Ratio(AB,DE),Ratio(BC,EF),Ratio(AC,DF))"],
+      "conclusion": "Similar(Triangle(ABC),Triangle(DEF))",
+      "condition": "三边对应成比例",
+      "category": "similar",
+      "reference": "人教版九年级下册 §27.2"
+    },
+    {
+      "id": "T_similar_sas",
+      "name": "相似三角形 SAS 判定",
+      "premise": ["Equal(Ratio(AB,DE),Ratio(AC,DF))", "Equal(Angle(BAC),Angle(EDF))"],
+      "conclusion": "Similar(Triangle(ABC),Triangle(DEF))",
+      "condition": "两边对应成比例且夹角相等",
+      "category": "similar",
+      "reference": "人教版九年级下册 §27.2"
+    },
+    {
+      "id": "T_similar_aa",
+      "name": "相似三角形 AA 判定",
+      "premise": ["Equal(Angle(ABC),Angle(DEF))", "Equal(Angle(ACB),Angle(DFE))"],
+      "conclusion": "Similar(Triangle(ABC),Triangle(DEF))",
+      "condition": "两角对应相等",
+      "category": "similar",
+      "reference": "人教版九年级下册 §27.2"
+    },
+    {
+      "id": "T_congruent_sss",
+      "name": "全等三角形 SSS",
+      "premise": ["Equal(AB,DE)", "Equal(BC,EF)", "Equal(AC,DF)"],
+      "conclusion": "Congruent(Triangle(ABC),Triangle(DEF))",
+      "condition": "三边对应相等",
+      "category": "congruent",
+      "reference": "人教版八年级上册 §12.2"
+    },
+    {
+      "id": "T_congruent_sas",
+      "name": "全等三角形 SAS",
+      "premise": ["Equal(AB,DE)", "Equal(Angle(BAC),Angle(EDF))", "Equal(AC,DF)"],
+      "conclusion": "Congruent(Triangle(ABC),Triangle(DEF))",
+      "condition": "两边及其夹角对应相等",
+      "category": "congruent",
+      "reference": "人教版八年级上册 §12.2"
+    },
+    {
+      "id": "T_pythagoras",
+      "name": "勾股定理",
+      "premise": ["Perpendicular(AB,AC)", "Triangle(ABC)"],
+      "conclusion": "Equal(Square(AB)+Square(AC),Square(BC))",
+      "condition": "直角三角形, ∠BAC=90°",
+      "category": "triangle",
+      "reference": "人教版八年级下册 §17.1"
+    },
+    {
+      "id": "T_sine_rule",
+      "name": "正弦定理",
+      "premise": ["Triangle(ABC)"],
+      "conclusion": "Equal(a/sin(A), b/sin(B), c/sin(C))",
+      "condition": "任意三角形, a,b,c 为对边",
+      "category": "triangle",
+      "reference": "人教版必修第五册 §6.4"
+    },
+    {
+      "id": "T_cosine_rule",
+      "name": "余弦定理",
+      "premise": ["Triangle(ABC)"],
+      "conclusion": "Equal(c^2, a^2+b^2-2ab*cos(C))",
+      "condition": "任意三角形",
+      "category": "triangle",
+      "reference": "人教版必修第五册 §6.4"
+    },
+    {
+      "id": "T_triangle_angle_sum",
+      "name": "三角形内角和定理",
+      "premise": ["Triangle(ABC)"],
+      "conclusion": "Equal(Angle(A)+Angle(B)+Angle(C), 180)",
+      "condition": "任意三角形",
+      "category": "triangle",
+      "reference": "人教版八年级上册 §11.2"
+    },
+    {
+      "id": "T_ellipse_definition",
+      "name": "椭圆定义",
+      "premise": ["On(P,Ellipse(E))", "Focus(E,F1,F2)"],
+      "conclusion": "Equal(Dist(P,F1)+Dist(P,F2), 2*a)",
+      "condition": "F1,F2 为焦点, 2a 为长轴长",
+      "category": "ellipse",
+      "reference": "人教版选择性必修第一册 §3.1"
+    },
+    {
+      "id": "T_parallel_corresponding_angle",
+      "name": "平行线同位角相等",
+      "premise": ["Parallel(Line(l),Line(m))", "Transversal(Line(t),l,m)"],
+      "conclusion": "Equal(CorrespondingAngle(l,m,t))",
+      "condition": "两直线平行被第三直线所截",
+      "category": "parallel",
+      "reference": "人教版七年级下册 §5.3"
+    },
+    {
+      "id": "T_parallel_alternate_interior",
+      "name": "平行线内错角相等",
+      "premise": ["Parallel(Line(l),Line(m))", "Transversal(Line(t),l,m)"],
+      "conclusion": "Equal(AlternateInteriorAngle(l,m,t))",
+      "condition": "两直线平行被第三直线所截",
+      "category": "parallel",
+      "reference": "人教版七年级下册 §5.3"
+    },
+    {
+      "id": "T_power_of_point",
+      "name": "相交弦定理",
+      "premise": ["On(A,Circle(O))", "On(B,Circle(O))", "On(C,Circle(O))", "On(D,Circle(O))", "Intersect(AB,CD) at P"],
+      "conclusion": "Equal(PA*PB, PC*PD)",
+      "condition": "弦 AB,CD 交于点 P",
+      "category": "circle",
+      "reference": "人教版九年级上册 §24.4"
+    }
+  ]
+}
