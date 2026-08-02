@@ -171,9 +171,15 @@ def _rescue_sanitize(latex: str) -> str:
     return body
 
 
-def compile_graph_pdf(graph: GeometryGraph, problem_text: str, out_path: str) -> str:
+def compile_graph_pdf(
+    graph: GeometryGraph,
+    problem_text: str,
+    out_path: str,
+    y_up: bool = False,
+    axes: bool = False,
+) -> str:
     """Convenience: render ``graph`` to LaTeX and compile to PDF."""
-    latex = graph_to_latex(graph, problem_text=problem_text)
+    latex = graph_to_latex(graph, problem_text=problem_text, y_up=y_up, axes=axes)
     return compile_pdf(latex, out_path)
 
 
@@ -183,10 +189,12 @@ def solution_to_pdf(
     graph: GeometryGraph | None = None,
     out_path: str = "solution_report.pdf",
     title: str = "几何题解答报告",
+    y_up: bool = False,
+    axes: bool = False,
 ) -> str:
     """Render a full solution report (problem + diagram + solution) to PDF."""
     from ..report import solution_to_latex
-    latex = solution_to_latex(problem_text, solution, graph, title)
+    latex = solution_to_latex(problem_text, solution, graph, title, y_up=y_up, axes=axes)
     return compile_pdf(latex, out_path, unique=True)
 
 
@@ -196,8 +204,10 @@ def multi_question_to_pdf(
     graph: GeometryGraph | None = None,
     out_path: str = "solution_report.pdf",
     title: str = "几何题解答报告",
+    y_up: bool = False,
+    axes: bool = False,
 ) -> str:
     """Render a multi-sub-question problem as a single PDF report."""
     from ..report import multi_question_to_latex
-    latex = multi_question_to_latex(problem_text, sub_questions, graph, title)
+    latex = multi_question_to_latex(problem_text, sub_questions, graph, title, y_up=y_up, axes=axes)
     return compile_pdf(latex, out_path, unique=True)

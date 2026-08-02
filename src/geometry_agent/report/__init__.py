@@ -144,13 +144,17 @@ def _to_chinese(text: str) -> str:
 
 _MATH_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
 # （ ） ， are included so full-width coordinates like （1，2） stay in one math segment
-_MATH_OPS = set("+-=*/().,^√π·×÷±∓<>≤≥≠≈≅∽∝|[]{}_（），∶")
-_MATH_GEO = set("∠⊥∥△→∵∴∈²³°∪∩⊂⊃∅∞⌒⊙□∟≡∉∀∃⇒⇔⋯…∼∘∂∑∏∫′")
+# − (U+2212) is the typographic minus sign common in Chinese exam text;
+# \u0304 is the combining macron (p̄ for sample mean). Both must stay inside
+# math segments so they convert cleanly instead of leaking into text mode.
+_MATH_OPS = set("+-=*/().,^√π·×÷±∓<>≤≥≠≈≅∽∝|[]{}_（），∶−\u0304")
+_MATH_GEO = set("∠⊥∥△→∵∴∈²³°∪∩⊂⊃∅∞⌒⊙□∟≡∉∀∃⇒⇔⋯…∼∘∂∑∏∫′∇")
 # Greek letters used in geometry (θ, α, β, γ, φ, ω, λ, μ, etc.)
-_MATH_GREEK = set("θαβγδεζηικμνξπρστυφχψωΘΑΒΓΔΛΣΦΨΩ")
-# Unicode subscript characters (₁₂₃...) and superscript (⁴⁵...)
-_MATH_SUB = set("₀₁₂₃₄₅₆₇₈₉")
-_MATH_SUP = set("⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
+_MATH_GREEK = set("θαβγδεζηικλμνξοπρστυφχψωΘΑΒΓΔΛΣΦΨΩ")
+# Unicode subscript characters: digits ₁₂₃..., letters ₙₖₓ..., operators ₊₋₌₍₎
+_MATH_SUB = set("₀₁₂₃₄₅₆₇₈₉ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ₊₋₌₍₎")
+# Unicode superscript characters: digits ⁰¹..., letters ᵃᵇᶜⁿ..., operators ⁺⁻⁼⁽⁾
+_MATH_SUP = set("⁰¹²³⁴⁵⁶⁷⁸⁹⁻ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖʳˢᵗᵘᵛʷˣʸᶻ⁺⁼⁽⁾")
 
 # Single-char symbol → LaTeX command.  IMPORTANT: commands that end in a letter
 # MUST have a trailing space so they don't merge with following letters
@@ -172,6 +176,7 @@ _SYM_TO_LATEX = {
     "∵": r"\because ",
     "∴": r"\therefore ",
     "∈": r"\in ",
+    "≌": r"\cong ",
     "²": "^2",
     "³": "^3",
     "¹": "^1",
@@ -196,6 +201,9 @@ _SYM_TO_LATEX = {
     "∃": r"\exists ",
     "⇒": r"\Rightarrow ",
     "⇔": r"\Leftrightarrow ",
+    "←": r"\leftarrow ",
+    "↔": r"\leftrightarrow ",
+    "∇": r"\nabla ",
     "⊙": r"\odot ",
     "□": r"\square ",
     "∟": r"\lrcorner ",
@@ -211,6 +219,7 @@ _SYM_TO_LATEX = {
     "∅": r"\varnothing ",
     "⌒": r"\frown ",  # fallback; "⌒AB" is handled by the overset pre-pass below
     "⁻": "^{-}",  # ⁻¹ is handled by the pre-pass; lone ⁻ kept valid
+    "−": "-",  # U+2212 typographic minus (common in Chinese exam text) → ASCII '-'
     # Greek letters (complete set)
     "ε": r"\varepsilon ",
     "η": r"\eta ",
@@ -252,6 +261,30 @@ _SYM_TO_LATEX = {
     # Unicode superscripts → ^{n}  (¹ ² ³ come from the main maps above)
     "⁰": "^{0}", "⁴": "^{4}", "⁵": "^{5}", "⁶": "^{6}", "⁷": "^{7}",
     "⁸": "^{8}", "⁹": "^{9}",
+}
+
+# Unicode subscript LETTERS/operators → plain ASCII (merged into one _{} group
+# by the run pre-pass, e.g. aₙ₊₁ → a_{n+1})
+_SUB_TO_ASCII = {
+    "₀": "0", "₁": "1", "₂": "2", "₃": "3", "₄": "4",
+    "₅": "5", "₆": "6", "₇": "7", "₈": "8", "₉": "9",
+    "ₐ": "a", "ₑ": "e", "ₕ": "h", "ᵢ": "i", "ⱼ": "j", "ₖ": "k",
+    "ₗ": "l", "ₘ": "m", "ₙ": "n", "ₒ": "o", "ₚ": "p", "ᵣ": "r",
+    "ₛ": "s", "ₜ": "t", "ᵤ": "u", "ᵥ": "v", "ₓ": "x",
+    "₊": "+", "₋": "-", "₌": "=", "₍": "(", "₎": ")",
+}
+
+# Unicode superscript LETTERS/operators → plain ASCII (merged into one ^{}
+# group by the run pre-pass, e.g. 2ⁿ⁻¹ → 2^{n-1})
+_SUP_TO_ASCII = {
+    "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4",
+    "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9",
+    "ᵃ": "a", "ᵇ": "b", "ᶜ": "c", "ᵈ": "d", "ᵉ": "e", "ᶠ": "f",
+    "ᵍ": "g", "ʰ": "h", "ⁱ": "i", "ʲ": "j", "ᵏ": "k", "ˡ": "l",
+    "ᵐ": "m", "ⁿ": "n", "ᵒ": "o", "ᵖ": "p", "ʳ": "r", "ˢ": "s",
+    "ᵗ": "t", "ᵘ": "u", "ᵛ": "v", "ʷ": "w", "ˣ": "x", "ʸ": "y",
+    "ᶻ": "z",
+    "⁺": "+", "⁻": "-", "⁼": "=", "⁽": "(", "⁾": ")",
 }
 
 
@@ -304,6 +337,38 @@ def _fix_sqrt_parens(text: str) -> str:
     return "".join(result)
 
 
+def _fix_caret_parens(text: str) -> str:
+    """Replace ``^(balanced expr)`` with ``^{balanced expr}``.
+
+    LLMs often write ``e^(iπ)`` / ``q^(n-1)``; a bare ``^`` followed by
+    ``(`` makes LaTeX raise the ``(`` as the superscript.  This scans for
+    ``^`` followed by ``(`` and finds the matching close paren by depth
+    counting (nested parens supported).
+    """
+    result: list[str] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] == "^" and i + 1 < n and text[i + 1] == "(":
+            depth = 1
+            j = i + 2
+            while j < n and depth > 0:
+                if text[j] == "(":
+                    depth += 1
+                elif text[j] == ")":
+                    depth -= 1
+                if depth == 0:
+                    break
+                j += 1
+            if depth == 0 and j < n:
+                result.append("^{" + text[i + 2 : j] + "}")
+                i = j + 1
+                continue
+        result.append(text[i])
+        i += 1
+    return "".join(result)
+
+
 def _convert_math_segment(seg: str) -> str:
     """Convert a raw math segment (no Chinese) to LaTeX math-mode content.
 
@@ -312,6 +377,22 @@ def _convert_math_segment(seg: str) -> str:
     fractions, redundant-paren stripping, and cleanup of extra spaces.
     """
     out = seg
+    # ---- Pre-pass: Unicode sub/superscript runs ----
+    # aₙ₊₁ → a_{n+1}, 2ⁿ⁻¹ → 2^{n-1}, x₁x₂ → x_{1}x_{2}; consecutive
+    # same-class glyphs merge into ONE braced group (never ^a^b, which is
+    # invalid LaTeX).
+    def _sub_run(m):
+        return "_{" + "".join(_SUB_TO_ASCII[c] for c in m.group(0)) + "}"
+
+    def _sup_run(m):
+        return "^{" + "".join(_SUP_TO_ASCII[c] for c in m.group(0)) + "}"
+
+    out = re.sub("[" + "".join(_SUB_TO_ASCII) + "]+", _sub_run, out)
+    out = re.sub("[" + "".join(_SUP_TO_ASCII) + "]+", _sup_run, out)
+    # p̄ → \bar{p}  (sample-mean notation)
+    out = re.sub(r"([A-Za-z])\u0304", r"\\bar{\1}", out)
+    # e^(iπ) → e^{i\pi}, q^(n-1) → q^{n-1}  (bare ^( with balanced parens)
+    out = _fix_caret_parens(out)
     # ---- Pre-pass: multi-char Unicode idioms before single-char mapping ----
     out = re.sub(r"⁻¹", r"^{-1}", out)                    # sin⁻¹x
     out = re.sub(r"⌒\s*([A-Z]{1,4})", r"\\overset{\\frown}{\1}", out)  # ⌒AB
@@ -327,6 +408,37 @@ def _convert_math_segment(seg: str) -> str:
     # \sqrt followed by digit/letter → \sqrt{...}
     out = re.sub(r"\\sqrt\s+(\d+)", r"\\sqrt{\1}", out)
     out = re.sub(r"\\sqrt\s+([A-Za-z])", r"\\sqrt{\1}", out)
+    # ---- Leibniz derivative notation ----
+    # d/d u d² = 0  →  \frac{\mathrm{d}(d^{2})}{\mathrm{d}u} = 0
+    # d/dx (x²+y²) →  \frac{\mathrm{d}(x^{2}+y^{2})}{\mathrm{d}x}
+    # d²/d u² f    →  \frac{\mathrm{d}^{2}(f)}{\mathrm{d}u^{2}}
+    # Must run BEFORE fraction conversion, which would otherwise turn the
+    # bare "d/d" into \frac{d}{d} and shred the notation into "dud²".
+    _deriv_operand = r"((?:\([^()]*\)|[^=;,。])+?)"
+    out = re.sub(
+        r"\bd/d\s*([a-zA-Z])\s*" + _deriv_operand + r"(?=\s*[=;,。]|\s*$)",
+        lambda m: f"\\frac{{\\mathrm{{d}}({m.group(2)})}}{{\\mathrm{{d}}{m.group(1)}}}",
+        out,
+    )
+    out = re.sub(
+        r"\bd\^\{?2\}?/d\s*([a-zA-Z])\^\{?2\}?\s*" + _deriv_operand + r"(?=\s*[=;,。]|\s*$)",
+        lambda m: f"\\frac{{\\mathrm{{d}}^{{2}}({m.group(2)})}}{{\\mathrm{{d}}{m.group(1)}^{{2}}}}",
+        out,
+    )
+    # ---- Partial derivative notation ----
+    # ∂f/∂x → \frac{\partial f}{\partial x};  ∂²f/∂x∂y → \frac{\partial^{2} f}{\partial x \partial y}
+    # Must run BEFORE fraction conversion: the bare "f/\partial" would
+    # otherwise become \partial \frac{f}{\partial} x (shredded).
+    out = re.sub(
+        r"\\partial\s*([A-Za-z])\s*/\s*\\partial\s*([A-Za-z])",
+        r"\\frac{\\partial \1}{\\partial \2}",
+        out,
+    )
+    out = re.sub(
+        r"\\partial\s*\^\{?2\}?\s*([A-Za-z])\s*/\s*\\partial\s*([A-Za-z])\\partial\s*([A-Za-z])",
+        r"\\frac{\\partial^{2} \1}{\\partial \2 \\partial \3}",
+        out,
+    )
     # S△ABC → S_{\triangle ABC}  (also S_\triangle without space)
     out = re.sub(r"S\\triangle\s*([A-Z]+)", r"S_{\\triangle \1}", out)
     # Coordinate subscripts: xM → x_M, yN → y_N, xA → x_A etc.
@@ -342,9 +454,42 @@ def _convert_math_segment(seg: str) -> str:
     # Single-letter subscripts (x_M, y_N) are kept as real subscripts.
     out = re.sub(r"(?<=[A-Za-z]{2})_(?=[A-Za-z])", r"\\_", out)
     # Math function names: cos, sin, tan, ln, log, exp → \cos, \sin, ...
-    for fn_name in ["cos", "sin", "tan", "cot", "sec", "csc",
-                    "ln", "log", "exp", "lim", "max", "min", "arcsin", "arccos", "arctan"]:
+    for fn_name in ["cos", "sin", "tan", "cot", "sec", "csc", "ln", "log", "exp",
+                    "lim", "max", "min", "arcsin", "arccos", "arctan",
+                    "sinh", "cosh", "tanh", "coth", "sech", "csch", "cosec",
+                    "arcsinh", "arccosh", "arctanh"]:
         out = re.sub(r"\b" + fn_name + r"(?![a-zA-Z])", r"\\" + fn_name + " ", out)
+    # Compact glued forms: sinx → \sin x, 2sinxcosx → 2\sin x\cos x.
+    # Multi-letter names run first so "sinh" wins over "sin h" ("cosec x"
+    # over "\cos ec x"); the single-letter pass then fills chains like
+    # "xsinx", "sinxcosx". English words (sine, sing, sinh, tangent, ...)
+    # are excluded via per-name suffix blocks.
+    _glue_block = {
+        "sin": r"(?:e|g|h|k|gle)",
+        "cos": r"(?:h|y)",
+        "tan": r"(?:h|k|g|gent)",
+        "cot": r"(?:h)",
+        "sec": r"(?:h|t|ond)",
+        "csc": r"(?:h)",
+        "log": r"(?:s)",
+        "exp": r"(?:ect)",
+    }
+    for fn_name in ["arcsinh", "arccosh", "arctanh",
+                    "arcsin", "arccos", "arctan",
+                    "sinh", "cosh", "tanh", "coth", "sech", "csch", "cosec"]:
+        out = re.sub(
+            r"(?<![A-Za-z\\])" + fn_name + r"(?=[a-zα-ω])",
+            r"\\" + fn_name + " ",
+            out,
+        )
+    for fn_name in ["sin", "cos", "tan", "cot", "sec", "csc", "ln", "log", "exp"]:
+        block = _glue_block.get(fn_name, "")
+        suffix = r"(?!" + block + r"\b)" if block else ""
+        out = re.sub(
+            r"(?<![\\])" + fn_name + r"(?=[a-zα-ω])" + suffix,
+            r"\\" + fn_name + " ",
+            out,
+        )
     # sqrt(number) without braces → sqrt{number}
     out = re.sub(r"\\sqrt\s*(\d+)", r"\\sqrt{\1}", out)
 
@@ -365,6 +510,8 @@ def _convert_math_segment(seg: str) -> str:
     # A "frac token" is one of (tried longest-first):
     #   N\sqrt{..}^d?          (e.g. 2\sqrt{5}, 2\sqrt{5}^2)
     #   \sqrt{..}^d?           (e.g. \sqrt{35})
+    #   \command               (e.g. \pi, \alpha — mapped Greek/ops)
+    #   \command x             (e.g. \sin x — glued func + single var)
     #   (balanced expr)^d?     (e.g. (x_{1}+x_{2}), (a+b)^2 — one level of nesting)
     #   letters^d              (e.g. x^2, AE^2)
     #   letters_{..}           (e.g. S_{1}, x_{1})
@@ -372,10 +519,16 @@ def _convert_math_segment(seg: str) -> str:
     #   -?digits               (e.g. 35, -5)
     _exp = r"(?:\^\{?\d+\}?)?"
     _paren = r"(?:\((?:[^()]|\([^()]*\))*\))+"
+    # sqrt body may itself contain braced groups (a^{2}, x_{1}), so match
+    # balanced braces at one nesting level instead of [^}]+ which truncates
+    # the radicand at the first inner "}".
+    _sqrt_body = r"(?:[^{}]|\{[^{}]*\})*"
     _frac_token = (
         r"(?:"
-        + r"\d*\\sqrt\{[^}]+\}" + _exp
-        + r"|\\sqrt\{[^}]+\}" + _exp
+        + r"\d*\\sqrt\{" + _sqrt_body + r"\}" + _exp
+        + r"|\\sqrt\{" + _sqrt_body + r"\}" + _exp
+        + r"|\\[A-Za-z]+\s*[A-Za-z]" + _exp
+        + r"|\\[A-Za-z]+" + _exp
         + r"|" + _paren + _exp
         + r"|[A-Za-z]{1,4}(?:\^\{?\d+\}?)"
         + r"|[A-Za-z]_\{[^}]+\}"
@@ -422,6 +575,20 @@ def _convert_math_segment(seg: str) -> str:
     out = re.sub(r"\s+\^", "^", out)
     # Remove space between \theta and following content if it's an operator
     out = re.sub(r"(\\theta\s+)\s", r"\1", out)
+    # ---- Matrix notation: [[a,b],[c,d]] → pmatrix ----
+    # LLMs write plain-text matrices; runs LAST so cells keep their already
+    # converted \frac/\sqrt content.
+    def _to_pmatrix(m):
+        inner = m.group(1)
+        rows = [r.strip() for r in inner.split("],[")]
+        body = r" \\ ".join(" & ".join(c.strip() for c in r.split(",")) for r in rows)
+        return r"\begin{pmatrix}" + body + r"\end{pmatrix}"
+
+    out = re.sub(r"\[\[(.*?)\]\]", _to_pmatrix, out)
+    # Dangling _ / ^ (followed by CJK, space or end — not letter/digit/brace)
+    # are invalid LaTeX sub/superscripts; escape so "01_初中" text compiles.
+    out = re.sub(r"(?<!\\)_" + r"(?![A-Za-z0-9{\\])", r"\\_", out)
+    out = re.sub(r"(?<!\\)\^" + r"(?![A-Za-z0-9{\\])", r"\\textasciicircum{}", out)
     return out.strip()
 
 
@@ -686,6 +853,8 @@ def solution_to_latex(
     solution: Solution | SolveResponse,
     graph: GeometryGraph | None = None,
     title: str = "几何题解答报告",
+    y_up: bool = False,
+    axes: bool = False,
 ) -> str:
     proof = getattr(solution, "proof", [])
     answer = getattr(solution, "answer", "")
@@ -702,7 +871,7 @@ def solution_to_latex(
 
     # ---- 几何图形 ----
     if graph is not None:
-        tikz = graph_to_tikz(graph)
+        tikz = graph_to_tikz(graph, y_up=y_up, axes=axes)
         if tikz:
             lines.append(r"\section*{二、几何图形}")
             lines.append(tikz)
@@ -797,6 +966,8 @@ def multi_question_to_latex(
     sub_questions: list[dict],
     graph: GeometryGraph | None = None,
     title: str = "几何题解答报告",
+    y_up: bool = False,
+    axes: bool = False,
 ) -> str:
     lines = _preamble(title)
     lines += [r"\begin{document}", r"\maketitle"]
@@ -818,7 +989,7 @@ def multi_question_to_latex(
 
     # ---- 几何图形 ----
     if graph is not None:
-        tikz = graph_to_tikz(graph)
+        tikz = graph_to_tikz(graph, y_up=y_up, axes=axes)
         if tikz:
             lines.append(r"\section*{二、几何图形}")
             lines.append(tikz)

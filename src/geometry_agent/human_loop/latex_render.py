@@ -162,7 +162,12 @@ def _edge_evidence(edge: Edge) -> str:
     return "; ".join(parts)
 
 
-def graph_to_latex(graph: GeometryGraph, problem_text: str = "") -> str:
+def graph_to_latex(
+    graph: GeometryGraph,
+    problem_text: str = "",
+    y_up: bool = False,
+    axes: bool = False,
+) -> str:
     """Convert ``graph`` to a complete LaTeX document string (ctexart).
 
     The document describes the geometry purely with text and tables -- no
@@ -211,7 +216,7 @@ def graph_to_latex(graph: GeometryGraph, problem_text: str = "") -> str:
         lines.append("")
 
     # ----- 几何图形 (TikZ redraw from parsed coords) -----
-    tikz = graph_to_tikz(graph)
+    tikz = graph_to_tikz(graph, y_up=y_up, axes=axes)
     if tikz:
         lines.append(r"\section*{几何图形（系统重建）}")
         lines.append(r"下图由系统根据解析到的坐标重建，供您核对点线位置是否正确。")
