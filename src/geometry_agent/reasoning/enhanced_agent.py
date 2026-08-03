@@ -118,22 +118,19 @@ class EnhancedReasoningAgent:
         self.client = LLMClient(self.config)
 
         # ---- Verification infrastructure ----
-        vcfg = getattr(self.config, "verification", None) or {}
-        if not isinstance(vcfg, dict):
-            vcfg = {
-                "lean_endpoint": getattr(vcfg, "lean_endpoint", None),
-                "symbolic_timeout_ms": getattr(vcfg, "symbolic_timeout_ms", None),
-                "max_retries": getattr(vcfg, "max_retries", None),
-            }
-        lean_endpoint = vcfg.get("lean_endpoint") or "http://10.42.0.124:9407"
-        symbolic_timeout_ms = vcfg.get("symbolic_timeout_ms") or 200
-        self.verification_max_retries = int(vcfg.get("max_retries") or 3)
+        vcfg = getattr(self.config, "verification", None)
+        if vcfg is None:
+            from ..config import VerificationConfig
+            vcfg = VerificationConfig()
+        lean_endpoint = getattr(vcfg, "lean_endpoint", "http://10.42.0.124:9407")
+        symbolic_timeout_ms = getattr(vcfg, "symbolic_timeout_ms", 200)
+        self.verification_max_retries = int(getattr(vcfg, "max_retries", 3))
         self.verifier = build_verifier(
             self.grade,
             lean_endpoint=lean_endpoint,
             symbolic_timeout_ms=symbolic_timeout_ms,
         )
-        self.llm_judge = LLMJudge(self.client)
+        self.llm_judge = LLMJudge(self.client) if getattr(vcfg, "llm_judge_enabled", True) else None
         self.verified_steps: dict[str, Step] = {}
         self._step_retries: dict[str, int] = {}
 
@@ -414,10 +411,13 @@ class EnhancedReasoningAgent:
                                 "step_id": step_id,
                             }
                         else:
-                            # Exhausted retries — fall back to LLM judge (stub for Task 6).
+                            # Exhausted retries — fall back to LLM judge if enabled.
                             failures = [verdict.reason or verdict.evidence or "verification failed"]
-                            judge_verdict = self.llm_judge.judge(step, premises, failures)
-                            if judge_verdict.verified in (VerifyState.TRUE, VerifyState.UNCERTAIN):
+                            if self.llm_judge is not None:
+                                judge_verdict = self.llm_judge.judge(step, premises, failures)
+                            else:
+                                judge_verdict = None
+                            if judge_verdict is not None and judge_verdict.verified in (VerifyState.TRUE, VerifyState.UNCERTAIN):
                                 self.verified_steps[step_id] = step
                                 result = {
                                     "verified": "uncertain" if judge_verdict.verified == VerifyState.UNCERTAIN else True,

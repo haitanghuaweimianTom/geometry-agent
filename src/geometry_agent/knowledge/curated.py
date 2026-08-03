@@ -143,31 +143,6 @@ PLANE_ENTRIES: list[KnowledgeEntry] = [
         applies_to=["四点共圆", "圆内接四边形", "对角互补"],
     ),
     KnowledgeEntry(
-        id="pg-menelaus",
-        subject=SubjectType.PLANE_GEOMETRY,
-        title="梅涅劳斯定理 (Menelaus)",
-        content=(
-            "直线截 △ABC 三边 BC、CA、AB (或其延长线) 于 D、E、F, "
-            "则 (BD/DC)·(CE/EA)·(AF/FB) = 1 (有向线段)。"
-            "用于证明三点共线或求共线线段比。属高等几何方法。"
-        ),
-        method_priority=MethodPriority.ADVANCED,
-        tags=["梅涅劳斯", "Menelaus", "共线", "线段比", "高等几何"],
-        applies_to=["三点共线", "线段比", "梅涅劳斯"],
-    ),
-    KnowledgeEntry(
-        id="pg-ceva",
-        subject=SubjectType.PLANE_GEOMETRY,
-        title="塞瓦定理 (Ceva)",
-        content=(
-            "△ABC 内一点 O, AO、BO、CO 交对边于 D、E、F, "
-            "则 (BD/DC)·(CE/EA)·(AF/FB) = 1。逆定理亦成立, 用于证明三线共点。"
-        ),
-        method_priority=MethodPriority.ADVANCED,
-        tags=["塞瓦", "Ceva", "共点", "线段比", "高等几何"],
-        applies_to=["三线共点", "线段比", "塞瓦"],
-    ),
-    KnowledgeEntry(
         id="pg-complex-method",
         subject=SubjectType.PLANE_GEOMETRY,
         title="复数法 (高等几何)",
@@ -190,6 +165,176 @@ PLANE_ENTRIES: list[KnowledgeEntry] = [
         method_priority=MethodPriority.ADVANCED,
         tags=["解析法", "坐标法", "高等几何", "坐标系"],
         applies_to=["解析法", "坐标法", "计算长度", "计算角度"],
+    ),
+]
+
+# New junior plane geometry seed entries (explicit grade; NOT auto-tagged)
+_JUNIOR_PLANE_SEEDS: list[KnowledgeEntry] = [
+    KnowledgeEntry(
+        id="pg-angle-bisector-theorem",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="角平分线定理(内角平分线分对边成比例)",
+        content=(
+            "三角形内角平分线分对边所得两条线段与这个角的两边对应成比例。"
+            "即在△ABC中, 若AD平分∠BAC交BC于D, 则BD/DC = AB/AC。"
+            "外角平分线定理为其推广, 外分对边成比例。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["角平分线", "成比例", "三角形", "初中几何"],
+        applies_to=["角平分线", "求比例", "线段比"],
+        grade=GradeLevel.JUNIOR,
+        proof_hint="用角平分线定理",
+    ),
+    KnowledgeEntry(
+        id="pg-median-length",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="三角形中线长公式(Apollonius)",
+        content=(
+            "三角形中线长公式: m_a = (1/2)√(2b² + 2c² − a²), 其中a为中线所对的边。"
+            "即三角形两边平方和等于第三边中线平方与第三边一半平方之和的两倍。"
+            "常用于已知三边求中线长。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["中线", "中线长", "阿波罗尼斯", "Apollonius", "初中几何"],
+        applies_to=["求中线长", "中线", "线段长度"],
+        grade=GradeLevel.JUNIOR,
+        proof_hint="用中线长公式(Apollonius)",
+    ),
+    KnowledgeEntry(
+        id="pg-projection-theorem",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="射影定理(直角三角形)",
+        content=(
+            "直角三角形射影定理(欧几里得定理): 在Rt△ABC中, ∠C=90°, CD⊥AB于D, "
+            "则 CD² = AD·BD, AC² = AD·AB, BC² = BD·AB。"
+            "直角边是其在斜边上射影与斜边的比例中项。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["射影定理", "直角三角形", "比例中项", "初中几何"],
+        applies_to=["射影定理", "直角三角形", "求线段", "比例中项"],
+        grade=GradeLevel.JUNIOR,
+        proof_hint="用射影定理",
+    ),
+    KnowledgeEntry(
+        id="pg-tangent-chord-angle",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="弦切角定理",
+        content=(
+            "弦切角等于它所夹弧所对的圆周角。"
+            "即切线与过切点的弦所夹的角等于该弦所对同侧弧的圆周角。"
+            "推论: 若两弦切角所夹弧相等, 则两弦切角相等。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["弦切角", "切线", "圆周角", "圆", "初中几何"],
+        applies_to=["弦切角", "切线与弦", "角相等"],
+        grade=GradeLevel.JUNIOR,
+        proof_hint="用弦切角定理",
+    ),
+    KnowledgeEntry(
+        id="pg-power-of-point",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="圆幂定理(相交弦+切割线)",
+        content=(
+            "圆幂定理统一了相交弦、割线、切割线三种情形: "
+            "过点P的直线与圆交于两点A、B, 则PA·PB为常数(点P对圆的幂)。"
+            "P在圆内时幂为负(相交弦定理PA·PB=PC·PD); P在圆外时幂为正; "
+            "P在圆上幂为0。切割线是割线的极限情形: PT²=PA·PB。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["圆幂", "相交弦", "切割线", "割线", "圆", "初中几何"],
+        applies_to=["圆幂定理", "相交弦", "切割线", "割线", "求线段"],
+        grade=GradeLevel.JUNIOR,
+        proof_hint="用圆幂定理",
+    ),
+    KnowledgeEntry(
+        id="pg-ceva",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="塞瓦定理(基础)",
+        content=(
+            "△ABC内, AD、BE、CF共点于O的充要条件是(BD/DC)·(CE/EA)·(AF/FB)=1。"
+            "用于证明三线共点(如重心、内心、垂心)。"
+            "初中竞赛常用, 高中课内不做要求。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["塞瓦", "Ceva", "三线共点", "线段比", "初中竞赛"],
+        applies_to=["三线共点", "塞瓦定理", "线段比"],
+        grade=GradeLevel.JUNIOR,
+        proof_hint="用塞瓦定理",
+    ),
+    KnowledgeEntry(
+        id="pg-menelaus",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="梅涅劳斯定理(基础)",
+        content=(
+            "一直线截△ABC三边BC、CA、AB或其延长线于D、E、F, 则"
+            "(BD/DC)·(CE/EA)·(AF/FB)=1(有向线段)。"
+            "用于证明三点共线或求线段比。与塞瓦定理互为对偶。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["梅涅劳斯", "Menelaus", "三点共线", "线段比", "初中竞赛"],
+        applies_to=["三点共线", "梅涅劳斯", "线段比"],
+        grade=GradeLevel.JUNIOR,
+        proof_hint="用梅涅劳斯定理",
+    ),
+    KnowledgeEntry(
+        id="pg-heron",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="海伦公式",
+        content=(
+            "已知三角形三边a,b,c, 设半周长p=(a+b+c)/2, 则面积S=√(p(p−a)(p−b)(p−c))。"
+            "海伦公式直接由三边求面积, 无需知道高或角。"
+            "中国古代秦九韶也有类似公式(三斜求积)。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["海伦", "海伦公式", "面积", "三边", "初中几何"],
+        applies_to=["海伦公式", "已知三边求面积", "面积"],
+        grade=GradeLevel.JUNIOR,
+        proof_hint="用海伦公式",
+    ),
+    KnowledgeEntry(
+        id="pg-midpoint-coord",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="中点坐标公式",
+        content=(
+            "若A(x₁,y₁), B(x₂,y₂), 则AB中点M的坐标为((x₁+x₂)/2, (y₁+y₂)/2)。"
+            "推广: 分点公式, P分AB比为m:n(AP:PB=m:n), 则P=((nx₁+mx₂)/(m+n), (ny₁+my₂)/(m+n))。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["中点", "坐标", "中点坐标", "分点", "初中几何"],
+        applies_to=["中点坐标", "求中点", "坐标计算"],
+        grade=GradeLevel.JUNIOR,
+        proof_hint="用中点坐标公式",
+    ),
+    KnowledgeEntry(
+        id="pg-parallel-proportional",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="平行线分线段成比例",
+        content=(
+            "三条平行线截两条直线, 所得对应线段成比例。"
+            "在△ABC中, DE∥BC交AB于D、AC于E, 则AD/DB=AE/EC, AD/AB=AE/AC=DE/BC。"
+            "是相似三角形的基础推论, 常用于求线段比。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["平行线", "成比例", "线段比", "相似", "初中几何"],
+        applies_to=["平行线分线段", "比例", "线段比"],
+        grade=GradeLevel.JUNIOR,
+        proof_hint="用平行线分线段成比例",
+    ),
+    # ---- 高中平面向量 ----
+    KnowledgeEntry(
+        id="sg-vector-collinear",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="向量三点共线条件",
+        content=(
+            "平面上A、B、C三点共线的充要条件: 存在实数λ使AB=λ·AC; 或对任一点O, "
+            "存在实数x,y使OC=x·OA+y·OB且x+y=1(共线向量定理/基底表示)。"
+            "向量坐标形式: (x_B−x_A)(y_C−y_A)=(y_B−y_A)(x_C−x_A)。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["向量", "共线", "三点共线", "平面向量", "高中"],
+        applies_to=["三点共线", "向量共线", "向量系数和"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用向量三点共线条件(系数和为1)",
     ),
 ]
 
@@ -376,6 +521,24 @@ TRIANGLE_ENTRIES: list[KnowledgeEntry] = [
         method_priority=MethodPriority.IN_CLASS,
         tags=["余弦", "求角", "余弦定理", "cos", "解三角形"],
         applies_to=["求角", "余弦定理", "已知三边求角"],
+    ),
+]
+
+_SENIOR_TRIANGLE_SEEDS: list[KnowledgeEntry] = [
+    # ---- 高中解三角形补充 ----
+    KnowledgeEntry(
+        id="sg-sine-area",
+        subject=SubjectType.TRIANGLE_SOLVING,
+        title="正弦定理面积公式",
+        content=(
+            "S=(1/2)ab·sinC=(1/2)bc·sinA=(1/2)ac·sinB=abc/(4R)=2R²·sinA·sinB·sinC,"
+            "其中R为外接圆半径。结合正弦定理,可用两角一边或两边夹角直接求面积。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["面积", "正弦定理", "sin", "外接圆", "高中"],
+        applies_to=["三角形面积", "正弦面积", "两边夹角求面积"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用正弦定理面积公式S=(1/2)ab·sinC",
     ),
 ]
 
@@ -588,6 +751,101 @@ ANALYTIC_ENTRIES: list[KnowledgeEntry] = [
         method_priority=MethodPriority.IN_CLASS,
         tags=["直线", "圆锥曲线", "位置关系", "判别式", "相交", "相切"],
         applies_to=["直线与圆锥曲线", "相交", "相切", "判别式"],
+    ),
+]
+
+_SENIOR_ANALYTIC_SEEDS: list[KnowledgeEntry] = [
+    # ---- 高中解析几何补充 ----
+    KnowledgeEntry(
+        id="sg-ellipse-focal-triangle-area",
+        subject=SubjectType.ANALYTIC_GEOMETRY,
+        title="椭圆焦点三角形面积",
+        content=(
+            "椭圆x²/a²+y²/b²=1上一点P与两焦点F₁、F₂构成△PF₁F₂(焦点三角形), "
+            "设∠F₁PF₂=θ, 则面积S=b²·tan(θ/2)。"
+            "由定义PF₁+PF₂=2a, 结合余弦定理推导。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["椭圆", "焦点三角形", "面积", "高中解析几何"],
+        applies_to=["椭圆焦点三角形", "椭圆面积", "焦点三角形"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用椭圆定义+余弦定理+面积公式b²·tan(θ/2)",
+    ),
+    KnowledgeEntry(
+        id="sg-hyperbola-asymptote",
+        subject=SubjectType.ANALYTIC_GEOMETRY,
+        title="双曲线渐近线方程",
+        content=(
+            "双曲线x²/a²−y²/b²=1的渐近线方程为y=±(b/a)x; "
+            "y²/a²−x²/b²=1的渐近线为y=±(a/b)x。"
+            "等轴双曲线a=b时渐近线为y=±x, 离心率e=√2。"
+            "渐近线可令标准方程右侧为0快速求出。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["双曲线", "渐近线", "圆锥曲线", "高中解析几何"],
+        applies_to=["双曲线渐近线", "双曲线方程", "渐近线"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用双曲线渐近线公式y=±(b/a)x",
+    ),
+    KnowledgeEntry(
+        id="sg-parabola-focal-chord",
+        subject=SubjectType.ANALYTIC_GEOMETRY,
+        title="抛物线焦点弦长公式",
+        content=(
+            "抛物线y²=2px(p>0)过焦点F(p/2,0)的弦AB, 倾斜角为θ, 则: "
+            "弦长|AB|=2p/sin²θ; x₁x₂=p²/4, y₁y₂=−p²; "
+            "1/|AF|+1/|BF|=2/p。焦点弦中通径(垂直于轴)最短,长为2p。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["抛物线", "焦点弦", "弦长", "圆锥曲线", "高中解析几何"],
+        applies_to=["抛物线焦点弦", "弦长", "抛物线"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用抛物线焦点弦长公式|AB|=2p/sin²θ",
+    ),
+    KnowledgeEntry(
+        id="sg-point-line-distance",
+        subject=SubjectType.ANALYTIC_GEOMETRY,
+        title="点到直线距离",
+        content=(
+            "点P(x₀,y₀)到直线l:Ax+By+C=0的距离d=|Ax₀+By₀+C|/√(A²+B²)。"
+            "两条平行线Ax+By+C₁=0与Ax+By+C₂=0间距d=|C₁−C₂|/√(A²+B²)。"
+            "由点向直线作垂线,利用投影长度推导。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["距离", "点到直线", "平行线距离", "高中解析几何"],
+        applies_to=["点到直线距离", "距离", "平行线距离"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用点到直线距离公式",
+    ),
+    KnowledgeEntry(
+        id="sg-vieta-conic",
+        subject=SubjectType.ANALYTIC_GEOMETRY,
+        title="韦达定理(圆锥曲线联立法)",
+        content=(
+            "直线y=kx+m与圆锥曲线联立消去y得Ax²+Bx+C=0, "
+            "韦达定理:x₁+x₂=−B/A, x₁x₂=C/A。弦长|AB|=√(1+k²)·√(x₁+x₂)²−4x₁x₂; "
+            "中点x₀=(x₁+x₂)/2。设而不求, 避免求解每个交点坐标。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["韦达定理", "联立", "圆锥曲线", "弦长", "设而不求", "高中解析几何"],
+        applies_to=["韦达定理", "联立圆锥曲线", "弦长", "中点弦"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用韦达定理联立后消元",
+    ),
+    KnowledgeEntry(
+        id="sg-parametric-max",
+        subject=SubjectType.ANALYTIC_GEOMETRY,
+        title="参数方程求最值",
+        content=(
+            "将曲线上的点用参数表示(如椭圆x=a·cosθ, y=b·sinθ), "
+            "把目标函数转化为关于参数的三角函数或代数函数, 再用三角有界性或导数求最值。"
+            "常用于距离最值、面积最值、斜率最值等问题。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["参数方程", "最值", "椭圆参数", "三角函数", "高中解析几何"],
+        applies_to=["参数方程", "最值问题", "椭圆参数"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用参数方程转化为三角函数求最值",
     ),
 ]
 
@@ -809,6 +1067,55 @@ SOLID_ENTRIES: list[KnowledgeEntry] = [
     ),
 ]
 
+_SENIOR_SOLID_SEEDS: list[KnowledgeEntry] = [
+    # ---- 高中立体几何补充 ----
+    KnowledgeEntry(
+        id="sg-plane-perpendicular",
+        subject=SubjectType.SOLID_GEOMETRY,
+        title="面面垂直判定定理",
+        content=(
+            "面面垂直判定: 一个平面过另一个平面的一条垂线, 则这两个平面互相垂直。"
+            "性质: 两平面垂直, 则一个平面内垂直于交线的直线垂直于另一个平面。"
+            "是二面角为90°的等价表述。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["面面垂直", "垂直", "判定", "立体几何", "高中"],
+        applies_to=["面面垂直", "证明垂直"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用面面垂直判定定理(找线面垂直)",
+    ),
+    KnowledgeEntry(
+        id="sg-normal-dihedral",
+        subject=SubjectType.SOLID_GEOMETRY,
+        title="法向量求二面角",
+        content=(
+            "设两平面法向量为n₁、n₂, 则二面角θ满足|cosθ|=|n₁·n₂|/(|n₁||n₂|)。"
+            "θ取锐角或钝角需结合图形判断(观察法向量方向): "
+            "若两法向量一个指向二面角内一个指向外,则θ=<n₁,n₂>;否则θ=π−<n₁,n₂>。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["法向量", "二面角", "空间向量", "立体几何", "高中"],
+        applies_to=["法向量求二面角", "二面角", "空间向量"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用两平面法向量点积求二面角",
+    ),
+    KnowledgeEntry(
+        id="sg-space-vector-angle",
+        subject=SubjectType.SOLID_GEOMETRY,
+        title="空间向量夹角公式",
+        content=(
+            "两向量a,b的夹角θ满足cosθ=(a·b)/(|a||b|)。"
+            "线线角取锐角或直角(取绝对值); 线面角φ满足sinφ=|a·n|/(|a||n|)(n为平面法向量); "
+            "点到平面距离d=|n·PA|/|n|,P为平面外一点,A为平面内任一点。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["空间向量", "夹角", "点积", "线面角", "距离", "立体几何", "高中"],
+        applies_to=["空间向量夹角", "线面角", "点到面距离"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用空间向量点积公式",
+    ),
+]
+
 SOLID_METHODS: list[MethodEntry] = [
     MethodEntry(
         id="sm-line-plane",
@@ -1011,9 +1318,28 @@ FUNCTION_ENTRIES: list[KnowledgeEntry] = [
             "ln(1+x) = x-x²/2+x³/3-...。"
             "竞赛中用于精确估计不等式。"
         ),
-        method_priority=MethodPriority.COMPETITION if hasattr(MethodPriority, 'COMPETITION') else MethodPriority.ADVANCED,
+        method_priority=MethodPriority.ADVANCED,
         tags=["泰勒", "展开", "近似"],
         applies_to=["不等式证明", "极限计算"],
+    ),
+]
+
+_SENIOR_FUNCTION_SEEDS: list[KnowledgeEntry] = [
+    # ---- 高中函数导数补充 ----
+    KnowledgeEntry(
+        id="sg-derivative-extremum-shift",
+        subject=SubjectType.FUNCTION_DERIVATIVE,
+        title="导数极值点偏移(基础)",
+        content=(
+            "若f(x)有极值点x₀,且f(x₁)=f(x₂),极值点偏移指x₁+x₂≠2x₀。"
+            "对称构造法:令F(x)=f(x₀+x)−f(x₀−x)(或f(x)−f(2x₀−x)), 研究F(x)在(0,+∞)符号, "
+            "判断x₁+x₂与2x₀的大小关系。对数均值不等式可用于速证。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["极值点偏移", "导数", "对称构造", "高中"],
+        applies_to=["极值点偏移", "双变量不等式", "导数压轴"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用对称构造法f(x)−f(2x₀−x)",
     ),
 ]
 
@@ -1092,14 +1418,425 @@ FUNCTION_METHODS: list[MethodEntry] = [
 
 
 # =====================================================================================
+# Probability & Statistics (概率与统计, 高中)
+# =====================================================================================
+
+PROBABILITY_ENTRIES: list[KnowledgeEntry] = [
+    KnowledgeEntry(
+        id="sg-normal-3sigma",
+        subject=SubjectType.PROBABILITY,
+        title="正态分布3σ原则",
+        content=(
+            "若随机变量X~N(μ,σ²),则P(μ−σ<X<μ+σ)≈0.6827, "
+            "P(μ−2σ<X<μ+2σ)≈0.9545, P(μ−3σ<X<μ+3σ)≈0.9973。"
+            "即几乎所有取值落在μ±3σ范围内,超出此范围概率不足0.3%, 称为3σ原则。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["正态分布", "3σ", "概率", "统计", "高中"],
+        applies_to=["正态分布", "3σ原则", "概率估计"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用正态分布3σ原则",
+    ),
+    KnowledgeEntry(
+        id="pg-prob-classical",
+        subject=SubjectType.PROBABILITY,
+        title="古典概型",
+        content=(
+            "古典概型: 试验所有可能结果有限且每个基本事件等可能, P(A)=A包含的基本事件数/总基本事件数。"
+            "关键是正确计数,常用枚举法、排列组合、树形图。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["古典概型", "概率", "计数", "高中"],
+        applies_to=["古典概型", "等可能事件概率"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用古典概型P(A)=m/n",
+    ),
+    KnowledgeEntry(
+        id="pg-prob-conditional",
+        subject=SubjectType.PROBABILITY,
+        title="条件概率与乘法公式",
+        content=(
+            "条件概率P(B|A)=P(AB)/P(A)(P(A)>0)。乘法公式P(AB)=P(A)·P(B|A)。"
+            "全概率公式P(B)=ΣP(A_i)·P(B|A_i)。贝叶斯公式P(A_i|B)=P(A_i)P(B|A_i)/P(B)。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["条件概率", "乘法公式", "全概率", "贝叶斯", "高中"],
+        applies_to=["条件概率", "全概率公式"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用条件概率公式",
+    ),
+    KnowledgeEntry(
+        id="pg-prob-expected",
+        subject=SubjectType.PROBABILITY,
+        title="离散型随机变量期望与方差",
+        content=(
+            "期望E(X)=Σx_i·p_i; 方差D(X)=Σ(x_i−E(X))²·p_i=E(X²)−(E(X))²。"
+            "性质: E(aX+b)=aE(X)+b; D(aX+b)=a²D(X)。"
+            "二项分布X~B(n,p): E(X)=np, D(X)=np(1−p)。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["期望", "方差", "随机变量", "二项分布", "高中"],
+        applies_to=["期望", "方差", "二项分布"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用期望方差公式E(X)=Σx_i·p_i",
+    ),
+    KnowledgeEntry(
+        id="pg-prob-independent",
+        subject=SubjectType.PROBABILITY,
+        title="独立事件与独立重复试验",
+        content=(
+            "事件A、B独立 ⟺ P(AB)=P(A)·P(B)。"
+            "n次独立重复试验(伯努利试验)中事件A发生k次的概率为P(X=k)=C(n,k)·p^k·(1−p)^{n−k}。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["独立事件", "独立重复", "伯努利", "二项分布", "高中"],
+        applies_to=["独立事件", "二项分布概率"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用独立事件概率公式",
+    ),
+]
+
+PROBABILITY_METHODS: list[MethodEntry] = [
+    MethodEntry(
+        id="pm-stats-3sigma",
+        subject=SubjectType.PROBABILITY,
+        name="3σ法",
+        priority=MethodPriority.IN_CLASS,
+        description="利用正态分布3σ原则估计概率区间",
+        steps=["确定μ和σ", "根据问题选择1σ/2σ/3σ区间", "查表或用固定概率值"],
+        applicable_when=["正态分布", "概率估计", "3σ"],
+        example="已知X~N(100,10²),求P(80<X<120)。",
+    ),
+    MethodEntry(
+        id="pm-classical",
+        subject=SubjectType.PROBABILITY,
+        name="古典概型法",
+        priority=MethodPriority.IN_CLASS,
+        description="用计数法求等可能事件概率",
+        steps=["确定总基本事件数n", "计数有利事件数m", "P=m/n"],
+        applicable_when=["古典概型", "等可能事件"],
+        example="掷两枚骰子,求点数和为7的概率。",
+    ),
+    MethodEntry(
+        id="pm-expected",
+        subject=SubjectType.PROBABILITY,
+        name="期望方差公式法",
+        priority=MethodPriority.IN_CLASS,
+        description="用E(X)=Σx_i·p_i和D(X)公式计算",
+        steps=["写出分布列", "计算E(X)", "计算D(X)=E(X²)−(E(X))²"],
+        applicable_when=["期望", "方差", "分布列"],
+        example="二项分布B(10,0.2)的期望与方差。",
+    ),
+    MethodEntry(
+        id="pm-conditional",
+        subject=SubjectType.PROBABILITY,
+        name="条件概率法",
+        priority=MethodPriority.IN_CLASS,
+        description="用条件概率、全概率公式计算复杂事件概率",
+        steps=["分析事件关系", "选择全概率/贝叶斯公式", "代入计算"],
+        applicable_when=["条件概率", "全概率", "贝叶斯"],
+        example="已知检测灵敏度和患病率,求阳性结果真正患病概率。",
+    ),
+]
+
+
+# =====================================================================================
+# Sequence & Combinatorics (数列与排列组合, 高中)
+# =====================================================================================
+
+SEQUENCE_ENTRIES: list[KnowledgeEntry] = [
+    KnowledgeEntry(
+        id="sg-stars-bars",
+        subject=SubjectType.SEQUENCE,
+        title="排列组合隔板法",
+        content=(
+            "隔板法用于求解相同元素分给不同对象的分法数。"
+            "n个相同球分给k个不同盒子(每盒至少1个): C(n−1,k−1); "
+            "每盒可空: C(n+k−1,k−1); 每盒至少t个: 令y_i=x_i−t+1化为正整数解。"
+            "方程x₁+...+x_k=n的正整数解个数C(n−1,k−1),非负整数解个数C(n+k−1,k−1)。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["排列组合", "隔板法", "stars and bars", "组合", "高中"],
+        applies_to=["隔板法", "相同元素分堆", "不定方程正整数解"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用隔板法(注意是否允许空盒)",
+    ),
+    KnowledgeEntry(
+        id="sg-sequence-telescoping",
+        subject=SubjectType.SEQUENCE,
+        title="数列裂项相消",
+        content=(
+            "裂项相消法: 将数列通项拆为两项之差,求和时中间项相互抵消。"
+            "常见裂项: 1/(n(n+1))=1/n−1/(n+1); 1/((2n−1)(2n+1))=(1/2)(1/(2n−1)−1/(2n+1)); "
+            "1/(√n+√(n+1))=√(n+1)−√n; 分式/根式差类均可裂项。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["数列", "裂项相消", "求和", "高中"],
+        applies_to=["裂项求和", "数列求和", "分式求和"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用裂项相消法,注意剩余首尾项",
+    ),
+    KnowledgeEntry(
+        id="pg-arithmetic-seq",
+        subject=SubjectType.SEQUENCE,
+        title="等差数列通项与求和",
+        content=(
+            "等差数列{a_n}: a_n=a₁+(n−1)d; 前n项和S_n=n(a₁+a_n)/2=na₁+n(n−1)d/2。"
+            "性质: 若m+n=p+q则a_m+a_n=a_p+a_q; S_n, S_{2n}−S_n, S_{3n}−S_{2n}也成等差。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["等差数列", "通项", "求和", "高中"],
+        applies_to=["等差数列", "数列求和"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用等差数列通项公式与求和公式",
+    ),
+    KnowledgeEntry(
+        id="pg-geometric-seq",
+        subject=SubjectType.SEQUENCE,
+        title="等比数列通项与求和",
+        content=(
+            "等比数列{a_n}: a_n=a₁·q^{n−1}; "
+            "前n项和S_n=na₁(q=1); S_n=a₁(1−q^n)/(1−q)(q≠1)。"
+            "无穷递缩等比(|q|<1): S=a₁/(1−q)。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["等比数列", "通项", "求和", "高中"],
+        applies_to=["等比数列", "数列求和"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用等比数列通项与求和公式",
+    ),
+    KnowledgeEntry(
+        id="pg-combinatorics-basic",
+        subject=SubjectType.SEQUENCE,
+        title="排列组合基本公式",
+        content=(
+            "排列数A(n,m)=n!/(n−m)!; 组合数C(n,m)=n!/(m!(n−m)!)。"
+            "C(n,m)=C(n,n−m); C(n,m)=C(n−1,m)+C(n−1,m−1)(帕斯卡恒等式)。"
+            "加法原理与乘法原理是计数基础。"
+        ),
+        method_priority=MethodPriority.IN_CLASS,
+        tags=["排列", "组合", "组合数", "计数", "高中"],
+        applies_to=["排列组合", "计数问题"],
+        grade=GradeLevel.SENIOR,
+        proof_hint="用排列组合公式A(n,m)与C(n,m)",
+    ),
+]
+
+SEQUENCE_METHODS: list[MethodEntry] = [
+    MethodEntry(
+        id="sm-telescoping",
+        subject=SubjectType.SEQUENCE,
+        name="裂项相消法",
+        priority=MethodPriority.IN_CLASS,
+        description="将通项拆为两项之差,求和时中间抵消",
+        steps=["对通项做裂项变形", "写出展开式", "抵消中间项", "合并首尾剩余项"],
+        applicable_when=["裂项相消", "数列求和", "分式型通项"],
+        example="求∑_{k=1}^{n} 1/(k(k+1))。",
+    ),
+    MethodEntry(
+        id="sm-stars-bars",
+        subject=SubjectType.SEQUENCE,
+        name="隔板法",
+        priority=MethodPriority.IN_CLASS,
+        description="用隔板法求解相同元素分配问题",
+        steps=["判断是否允许空盒", "转化为正整数解(或非负整数解)", "套用隔板公式"],
+        applicable_when=["隔板法", "相同元素分配", "不定方程解数"],
+        example="10个相同球分给3个小朋友,每人至少1个,有多少种分法?",
+    ),
+    MethodEntry(
+        id="sm-arith-geo",
+        subject=SubjectType.SEQUENCE,
+        name="等差等比基本法",
+        priority=MethodPriority.IN_CLASS,
+        description="识别等差/等比,套用通项与求和公式",
+        steps=["确定数列类型", "求首项与公差(比)", "套通项与求和公式"],
+        applicable_when=["等差数列", "等比数列", "基本数列"],
+        example="等差数列a₁=2,d=3,求前20项和。",
+    ),
+    MethodEntry(
+        id="sm-group-sum",
+        subject=SubjectType.SEQUENCE,
+        name="分组求和/错位相减法",
+        priority=MethodPriority.IN_CLASS,
+        description="分组求和或错位相减法处理等差乘等比型数列",
+        steps=["分组:按等差/等比分别求和;错位:写出S_n与qS_n相减", "化简得S_n"],
+        applicable_when=["等差乘等比", "分组求和", "错位相减"],
+        example="求∑_{k=1}^n k·2^k。",
+    ),
+]
+
+
+# =====================================================================================
+# Competition-level entries (竞赛)
+# =====================================================================================
+
+COMPETITION_ENTRIES: list[KnowledgeEntry] = [
+    KnowledgeEntry(
+        id="cp-desargues",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="Desargues定理",
+        content=(
+            "Desargues定理: 两三角形对应顶点连线共点, 当且仅当对应边交点共线。"
+            "是射影几何基本定理之一。在竞赛中可直接用于证明共点、共线问题, 无需依赖坐标。"
+        ),
+        method_priority=MethodPriority.ADVANCED,
+        tags=["Desargues", "德萨格", "射影几何", "共点共线", "竞赛"],
+        applies_to=["三线共点", "三点共线", "射影几何"],
+        grade=GradeLevel.COMPETITION,
+        proof_hint="用Desargues定理,检查对应顶点连线是否共点",
+    ),
+    KnowledgeEntry(
+        id="cp-pascal",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="Pascal圆内接六边形定理",
+        content=(
+            "Pascal定理: 圆内接六边形三对对边的交点共线(Pascal线)。"
+            "对圆锥曲线也成立。退化情形: 五边形/四边形/三角形情形对应已知的共点结论。"
+            "用于证明三点共线, 是竞赛几何的重要工具。"
+        ),
+        method_priority=MethodPriority.ADVANCED,
+        tags=["Pascal", "帕斯卡", "圆内接六边形", "共线", "竞赛"],
+        applies_to=["三点共线", "圆内接六边形", "Pascal定理"],
+        grade=GradeLevel.COMPETITION,
+        proof_hint="用Pascal定理,取六顶点按顺序找三组对边交点",
+    ),
+    KnowledgeEntry(
+        id="cp-pole-polar",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="极点极线定义与性质",
+        content=(
+            "给定二次曲线Γ与不在曲线上的点P,过P的直线交Γ于A,B,"
+            "Q是P关于A,B的调和共轭点,则Q的轨迹是P关于Γ的极线。"
+            "配极原则: P在Q的极线上 ⟺ Q在P的极线上。自极三角形与配极变换是竞赛热门。"
+        ),
+        method_priority=MethodPriority.ADVANCED,
+        tags=["极点", "极线", "配极", "调和共轭", "射影几何", "竞赛"],
+        applies_to=["极点极线", "调和分割", "配极原则"],
+        grade=GradeLevel.COMPETITION,
+        proof_hint="用极点极线配极原则",
+    ),
+    KnowledgeEntry(
+        id="cp-inversion",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="反演变换基本性质",
+        content=(
+            "以O为中心、r为半径的反演变换: P→P'满足O,P,P'共线且OP·OP'=r²。"
+            "反演保持圆和直线(过圆心的直线→自身;过圆心的圆→不过圆心的直线; "
+            "不过圆心的圆→不过圆心的圆);反演保持交角(保角), 相切/正交保持。"
+        ),
+        method_priority=MethodPriority.ADVANCED,
+        tags=["反演", "反演变换", "保角", "圆的反演", "竞赛"],
+        applies_to=["反演变换", "圆共点", "圆相切"],
+        grade=GradeLevel.COMPETITION,
+        proof_hint="用反演变换,将共点圆反演为直线或共点圆",
+    ),
+    KnowledgeEntry(
+        id="cp-complex-rotation",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="复数法旋转",
+        content=(
+            "将点置于复平面,乘以e^{iθ}等价于绕原点旋转θ角。"
+            "若AB绕A旋转90°至AC,则c−a=i(b−a);旋转60°则乘以e^{iπ/3}=(1±i√3)/2。"
+            "可统一处理共点、等角、正多边形、垂心/外心等问题。"
+        ),
+        method_priority=MethodPriority.ADVANCED,
+        tags=["复数法", "旋转", "复平面", "竞赛"],
+        applies_to=["旋转问题", "等角问题", "复数法几何"],
+        grade=GradeLevel.COMPETITION,
+        proof_hint="用复数法,旋转即乘单位复数",
+    ),
+    KnowledgeEntry(
+        id="cp-schur",
+        subject=SubjectType.FUNCTION_DERIVATIVE,
+        title="Schur不等式",
+        content=(
+            "Schur不等式: 对任意非负实数a,b,c及r≥0, "
+            "a^r(a−b)(a−c) + b^r(b−a)(b−c) + c^r(c−a)(c−b) ≥ 0。"
+            "r=1时为经典Schur: a³+b³+c³+3abc ≥ a²(b+c)+b²(a+c)+c²(a+b)。"
+            "是不等式证明的强力工具,常与AM-GM搭配使用。"
+        ),
+        method_priority=MethodPriority.ADVANCED,
+        tags=["Schur", "舒尔", "不等式", "竞赛代数"],
+        applies_to=["不等式证明", "对称不等式", "Schur不等式"],
+        grade=GradeLevel.COMPETITION,
+        proof_hint="用Schur不等式(r=1)",
+    ),
+    KnowledgeEntry(
+        id="cp-weighted-amgm",
+        subject=SubjectType.FUNCTION_DERIVATIVE,
+        title="AM-GM加权不等式",
+        content=(
+            "加权AM-GM: 若λ₁+...+λ_n=1,λ_i>0,则Σλ_i·x_i ≥ Πx_i^{λ_i}。"
+            "等号当且仅当x₁=x₂=...=x_n时成立。普通AM-GM是λ_i=1/n特例。"
+            "常用于齐次不等式、条件极值、带约束优化问题。"
+        ),
+        method_priority=MethodPriority.ADVANCED,
+        tags=["加权AM-GM", "不等式", "均值不等式", "竞赛代数"],
+        applies_to=["不等式证明", "条件最值", "加权均值"],
+        grade=GradeLevel.COMPETITION,
+        proof_hint="用加权AM-GM,选合适权重",
+    ),
+    KnowledgeEntry(
+        id="cp-harmonic-range",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="调和点列",
+        content=(
+            "共线四点A,C,B,D成调和点列(A,B;C,D)=−1,即(AC/CB)/(AD/DB)=−1(有向线段)。"
+            "等价于C、D分别为AB的内外分点且比相同(调和共轭)。"
+            "完全四边形、极点极线、Apollonius圆均与调和点列密切相关。"
+        ),
+        method_priority=MethodPriority.ADVANCED,
+        tags=["调和点列", "调和分割", "完全四边形", "射影几何", "竞赛"],
+        applies_to=["调和点列", "内外分点", "完全四边形"],
+        grade=GradeLevel.COMPETITION,
+        proof_hint="用调和点列(交比=-1)",
+    ),
+    KnowledgeEntry(
+        id="cp-area-elimination",
+        subject=SubjectType.PLANE_GEOMETRY,
+        title="面积法消点",
+        content=(
+            "面积法(消点法): 以三角形面积比为基本工具,通过面积公式消去辅助点。"
+            "核心公式: 共高三角形面积比=底之比; 共边定理; S_{ABC}/S_{ABD}=CE/ED(AB∩CD=E)。"
+            "张景中面积法体系可机械化证明一大类平面几何题。"
+        ),
+        method_priority=MethodPriority.ADVANCED,
+        tags=["面积法", "消点法", "共边定理", "张景中", "竞赛"],
+        applies_to=["面积比", "消点", "面积法"],
+        grade=GradeLevel.COMPETITION,
+        proof_hint="用面积法(共高/共边定理消点)",
+    ),
+    KnowledgeEntry(
+        id="cp-universal-substitution",
+        subject=SubjectType.TRIANGLE_SOLVING,
+        title="三角恒等变换万能公式",
+        content=(
+            "万能代换(Weierstrass代换): 令t=tan(x/2),则sinx=2t/(1+t²), "
+            "cosx=(1−t²)/(1+t²), tanx=2t/(1−t²)。"
+            "将三角方程化为关于t的有理方程,配合积化和差、和差化积等恒等式, "
+            "可统一处理三角恒等式证明与三角方程求解。"
+        ),
+        method_priority=MethodPriority.ADVANCED,
+        tags=["万能公式", "三角恒等变换", "万能代换", "竞赛三角"],
+        applies_to=["三角恒等", "万能代换", "三角方程"],
+        grade=GradeLevel.COMPETITION,
+        proof_hint="用万能代换t=tan(x/2)",
+    ),
+]
+
+COMPETITION_METHODS: list[MethodEntry] = []
+
+
+# =====================================================================================
 # Aggregated exports
 # =====================================================================================
 
-CURATED_ENTRIES: list[KnowledgeEntry] = (
+# Phase 1: build legacy entries and auto-grade them via keyword heuristics.
+_LEGACY_ENTRIES: list[KnowledgeEntry] = (
     PLANE_ENTRIES + TRIANGLE_ENTRIES + ANALYTIC_ENTRIES + SOLID_ENTRIES
     + FUNCTION_ENTRIES
 )
-CURATED_METHODS: list[MethodEntry] = (
+_LEGACY_METHODS: list[MethodEntry] = (
     PLANE_METHODS + TRIANGLE_METHODS + ANALYTIC_METHODS + SOLID_METHODS
     + FUNCTION_METHODS
 )
@@ -1107,7 +1844,8 @@ CURATED_METHODS: list[MethodEntry] = (
 
 # =====================================================================================
 # Grade tagging: mark junior-high-applicable items as JUNIOR so the knowledge
-# manager can scope retrieval by grade. Items not matched stay SENIOR default.
+# manager can scope retrieval by grade. Only legacy entries are auto-graded;
+# new seed entries carry an explicit grade set in their constructor.
 # =====================================================================================
 
 # Keywords that indicate junior-high (初中) curriculum content.
@@ -1115,7 +1853,8 @@ _JUNIOR_KEYWORDS = {
     # plane geometry
     "全等", "相似", "勾股", "圆周角", "圆心角", "切线", "弦", "割线", "射影定理",
     "三角形内角和", "外角", "中线", "高线", "角平分线", "中位线", "平行线",
-    "等腰", "等边", "直角三角形", "垂径", "切线长", "相交弦",
+    "等腰", "等边", "直角三角形", "垂径", "切线长", "相交弦", "弦切角",
+    "塞瓦", "梅涅劳斯", "圆幂", "海伦", "中点坐标", "平行线分线段",
     # triangle solving (正弦/余弦定理在初中阶段部分接触, 高中正式)
     "海伦", "面积公式",
     # solid geometry basics introduced in junior high
@@ -1124,17 +1863,23 @@ _JUNIOR_KEYWORDS = {
 # Keywords that are strictly senior-high (高中) only.
 _SENIOR_ONLY_KEYWORDS = {
     "向量", "坐标法", "解析", "极坐标", "参数方程", "椭圆", "双曲线", "抛物线",
-    "射影几何", "仿射", "复数法", "重心坐标", "空间向量", "法向量", "二面角",
+    "射影几何", "仿射", "重心坐标", "空间向量", "法向量", "二面角",
     "吴方法", "机器证明", "投影", "轨迹方程", "韦达定理",
+    "焦点三角形", "渐近线", "焦点弦", "正态分布", "隔板法", "裂项",
     # function & derivative (all senior-only)
-    "导数", "求导", "积分", "切线斜率", "极值", "最值", "单调性",
+    "导数", "求导", "积分", "切线斜率", "极值点偏移", "单调性",
     "链式法则", "驻点", "拐点", "泰勒", "洛必达", "拉格朗日",
+    # probability & statistics
+    "概率", "正态分布", "排列组合", "数列",
 }
 # Keywords that indicate competition-level (竞赛) content.
 _COMPETITION_KEYWORDS = {
     "泰勒展开", "洛必达", "拉格朗日", "中值定理", "极坐标", "参数方程",
     "射影几何", "仿射", "复数法", "配点", "引理", "极端原理", "齐次化",
     "竞赛", "奥数", "imo",
+    "Desargues", "Pascal", "德萨格", "帕斯卡", "极点极线", "反演",
+    "Schur", "舒尔", "调和点列", "调和分割", "面积法消点", "万能公式",
+    "AM-GM", "加权",
 }
 
 
@@ -1159,10 +1904,25 @@ def _tag_grade(item) -> None:
         item.grade = GradeLevel.SENIOR
 
 
-for _e in CURATED_ENTRIES:
+for _e in _LEGACY_ENTRIES:
     _tag_grade(_e)
-for _m in CURATED_METHODS:
+for _m in _LEGACY_METHODS:
     _tag_grade(_m)
+
+
+# Phase 2: append explicit-grade seed entries (junior/senior/competition).
+# These are NOT run through _tag_grade; they carry explicit grades.
+CURATED_ENTRIES: list[KnowledgeEntry] = (
+    _LEGACY_ENTRIES
+    + _JUNIOR_PLANE_SEEDS
+    + _SENIOR_TRIANGLE_SEEDS + _SENIOR_ANALYTIC_SEEDS + _SENIOR_SOLID_SEEDS + _SENIOR_FUNCTION_SEEDS
+    + PROBABILITY_ENTRIES + SEQUENCE_ENTRIES
+    + COMPETITION_ENTRIES
+)
+CURATED_METHODS: list[MethodEntry] = (
+    _LEGACY_METHODS
+    + PROBABILITY_METHODS + SEQUENCE_METHODS + COMPETITION_METHODS
+)
 
 
 def entries_by_subject(subject: SubjectType) -> list[KnowledgeEntry]:

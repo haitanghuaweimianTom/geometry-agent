@@ -55,6 +55,8 @@ _SUBJECT_GRADES = {
     SubjectType.ANALYTIC_GEOMETRY: {GradeLevel.SENIOR, GradeLevel.COMPETITION},
     SubjectType.SOLID_GEOMETRY: {GradeLevel.SENIOR},
     SubjectType.FUNCTION_DERIVATIVE: {GradeLevel.SENIOR, GradeLevel.COMPETITION},
+    SubjectType.PROBABILITY: {GradeLevel.SENIOR, GradeLevel.COMPETITION},
+    SubjectType.SEQUENCE: {GradeLevel.SENIOR, GradeLevel.COMPETITION},
 }
 
 # Grade ordering for escalation.
@@ -80,6 +82,8 @@ def resolve_grade(subject: SubjectType, grade: GradeLevel) -> tuple[GradeLevel, 
                 SubjectType.ANALYTIC_GEOMETRY: "解析几何",
                 SubjectType.SOLID_GEOMETRY: "立体几何",
                 SubjectType.FUNCTION_DERIVATIVE: "函数导数",
+                SubjectType.PROBABILITY: "概率与统计",
+                SubjectType.SEQUENCE: "数列与排列组合",
             }.get(subject, subject.value)
             return g, f"注意：{subject_name}不适用{grade.value}级别，已自动调整为{g.value}级别。"
     return GradeLevel.SENIOR, ""
@@ -147,6 +151,8 @@ class KnowledgeManager:
             "analytic_geometry": "解析几何",
             "solid_geometry": "立体几何",
             "function_derivative": "函数与导数",
+            "probability": "概率与统计",
+            "sequence": "数列与排列组合",
         }.get(knowledge.topic.value, knowledge.topic.value)
 
         # Resolve effective grade + escalation note
@@ -170,7 +176,8 @@ class KnowledgeManager:
             for i, m in enumerate(knowledge.methods, 1):
                 label = _PRIORITY_LABEL.get(m.priority, m.priority.name)
                 tag = " [推荐优先尝试]" if m.priority == MethodPriority.IN_CLASS else ""
-                lines.append(f"{i}. {m.name} ({label}){tag}")
+                hint = f"（提示：{m.proof_hint}）" if getattr(m, "proof_hint", "") else ""
+                lines.append(f"{i}. {m.name}{hint} ({label}){tag}")
                 if m.description:
                     lines.append(f"   - 说明: {m.description}")
                 if m.applicable_when:
@@ -183,7 +190,8 @@ class KnowledgeManager:
             lines.append("## 相关知识点")
             for i, e in enumerate(knowledge.entries, 1):
                 src = "联网" if e.source == "web" else "课内"
-                lines.append(f"{i}. {e.title} [{src}]")
+                hint = f"（提示：{e.proof_hint}）" if e.proof_hint else ""
+                lines.append(f"{i}. {e.title}{hint} [{src}]")
                 content = e.content.replace("\n", " ")
                 if len(content) > 160:
                     content = content[:160] + "…"

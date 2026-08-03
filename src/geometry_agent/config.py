@@ -51,6 +51,15 @@ class DSLConfig(BaseModel):
     compact: bool = False  # omit coordinates to save tokens
 
 
+class VerificationConfig(BaseModel):
+    enabled: bool = True
+    max_retries: int = 3
+    symbolic_timeout_ms: int = 200
+    lean_endpoint: str = "http://10.42.0.124:9407"
+    lean_timeout_s: int = 10
+    llm_judge_enabled: bool = True
+
+
 class LLMConfig(BaseModel):
     model: str = "GLM-5.2"
     api_key: str = ""
@@ -61,6 +70,7 @@ class LLMConfig(BaseModel):
     max_reflections: int = 3
     voting_n: int = 1  # 1 = single path; >1 = self-consistency
     fewshot_dir: str = "prompts/fewshot"
+    verification: VerificationConfig = VerificationConfig()
 
 
 class SolverConfig(BaseModel):
@@ -110,6 +120,7 @@ class Settings(BaseSettings):
     human_loop: HumanLoopConfig = HumanLoopConfig()
     knowledge: KnowledgeConfig = KnowledgeConfig()
     code_exec: CodeExecConfig = CodeExecConfig()
+    verification: VerificationConfig = VerificationConfig()
 
     debug: bool = False
     log_level: str = "INFO"
@@ -133,7 +144,18 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
             data = yaml.safe_load(f) or {}
         # nested update
         for key, val in data.items():
-            if hasattr(settings, key) and isinstance(val, dict):
+            if key == "verification" and isinstance(val, dict):
+                # Propagate top-level verification block into llm.verification
+                sub = settings.llm.verification
+                for k, v in val.items():
+                    if hasattr(sub, k):
+                        setattr(sub, k, v)
+                if hasattr(settings, key):
+                    sub_top = getattr(settings, key)
+                    for k, v in val.items():
+                        if hasattr(sub_top, k):
+                            setattr(sub_top, k, v)
+            elif hasattr(settings, key) and isinstance(val, dict):
                 sub = getattr(settings, key)
                 for k, v in val.items():
                     if hasattr(sub, k):

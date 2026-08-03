@@ -355,6 +355,8 @@ class SubjectType(str, Enum):
     ANALYTIC_GEOMETRY = "analytic_geometry"        # 解析几何 (含圆锥曲线)
     SOLID_GEOMETRY = "solid_geometry"              # 立体几何
     FUNCTION_DERIVATIVE = "function_derivative"    # 函数与导数
+    PROBABILITY = "probability"                    # 概率与统计
+    SEQUENCE = "sequence"                          # 数列与排列组合
 
 
 class MethodPriority(int, Enum):
@@ -374,6 +376,8 @@ class KnowledgeEntry(BaseModel):
     applies_to: list[str] = Field(default_factory=list)  # problem patterns
     source: str = "curated"              # curated / web
     grade: GradeLevel = GradeLevel.SENIOR  # junior / senior / both
+    formal_id: str = ""                  # SymPy callable or Lean theorem id
+    proof_hint: str = ""                 # Chinese hint for the LLM
 
 
 class MethodEntry(BaseModel):
@@ -387,6 +391,8 @@ class MethodEntry(BaseModel):
     applicable_when: list[str] = Field(default_factory=list)
     example: str = ""
     grade: GradeLevel = GradeLevel.SENIOR  # junior / senior
+    formal_id: str = ""                  # SymPy callable or Lean theorem id
+    proof_hint: str = ""                 # Chinese hint for the LLM
 
 
 class RetrievedKnowledge(BaseModel):

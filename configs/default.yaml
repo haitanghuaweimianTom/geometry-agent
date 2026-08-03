@@ -1,0 +1,93 @@
+# Default configuration for Geometry Agent (see design/11-Engineering.md).
+
+debug: false
+log_level: INFO
+
+parser:
+  deskew_threshold_deg: 1.0
+  skeleton_method: zhang_suen
+  ocr_enabled: true
+  sam_enabled: false        # set true + checkpoint when SAM available
+  sam_checkpoint: ""
+  yolo_weights: ""
+
+graph:
+  spatial_bucket_px: 40.0
+  relation_parallel_workers: 4
+
+verifier:
+  on_line_abs_tol: 2.0
+  on_line_rel_tol: 0.005
+  on_circle_abs_tol: 2.0
+  on_circle_rel_tol: 0.015
+  perp_angle_tol_deg: 3.0
+  parallel_angle_tol_deg: 3.0
+  tangent_abs_tol: 2.0
+  tangent_rel_tol: 0.015
+  equal_rel_tol: 0.02
+  equal_angle_tol_deg: 2.0
+  ellipse_sum_rel_tol: 0.015
+  collinear_abs_tol: 2.0
+  collinear_rel_tol: 0.005
+  concentric_abs_tol: 2.0
+  concentric_rel_tol: 0.01
+  uncertain_band_mult: 3.0
+
+dsl:
+  include_uncertain: false
+  compact: false
+
+llm:
+  # ai-gateway (OpenAI-compatible). Available models:
+  #   GLM-5.2 / deepseek-v4-pro-260425 / deepseek-v4-flash-260425
+  #   doubao-seed-evolving / doubao-seed-2-1-pro-260628 / doubao-seed-2-1-turbo-260628
+  model: GLM-5.2
+  api_key: agw_gk_55b4b8f8d1e0417890b11466f4ca11e2_-J1HiaNXqd4ZYRbl_cKXajFJCQiCzBu4
+  base_url: http://118.196.164.179:8001/ai-gateway/v1
+  temperature: 0.3
+  max_tokens: 8192
+  max_tool_calls: 60
+  max_reflections: 3
+  voting_n: 1
+  fewshot_dir: prompts/fewshot
+
+solver:
+  sympy_enabled: true
+  z3_enabled: true
+  rule_engine_enabled: true
+  lean_enabled: false
+  theorem_db_path: theorems/theorems.json
+
+human_loop:
+  enabled: true
+  interactive: false        # CLI 交互模式
+  out_dir: outputs
+  max_rounds: 5
+  open_pdf: false           # 是否自动打开 PDF
+
+knowledge:
+  enabled: true
+  db_path: knowledge/curated.json   # 持久化路径(可选)
+  web_enabled: false              # 联网搜索已关闭：系统不得联网，纯本地推理
+  web_timeout: 15.0
+  min_local_entries: 3               # 本地不足此数才联网
+
+code_exec:
+  enabled: true
+  timeout_sec: 10.0
+  max_output_chars: 2000
+  allow_imports:
+    - math
+    - numpy
+    - sympy
+    - fractions
+    - decimal
+    - statistics
+
+verification:
+  enabled: true
+  max_retries: 3
+  symbolic_timeout_ms: 200
+  lean_endpoint: "http://10.42.0.124:9407"
+  lean_timeout_s: 10
+  llm_judge_enabled: true

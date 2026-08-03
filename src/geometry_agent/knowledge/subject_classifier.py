@@ -35,6 +35,14 @@ _FUNCTION_KEYWORDS = (
     "分段函数", "复合函数", "反函数", "二阶导",
     "f(x)", "f'(x)", "f''(x)",
 )
+_PROBABILITY_KEYWORDS = (
+    "概率", "正态分布", "期望", "方差", "分布列", "随机变量",
+    "3σ", "二项分布", "超几何分布", "统计",
+)
+_SEQUENCE_KEYWORDS = (
+    "数列", "等差数列", "等比数列", "通项", "前n项", "裂项",
+    "排列", "组合", "隔板法", "数学归纳法", "递推",
+)
 # NOTE: "切线方程", "三角函数", "sinx", "cosx", "tanx", "lnx" removed from
 # function keywords — they are ambiguous (切线 could be conic or function;
 # sin/cos could be triangle-solving).  Function classification now relies on
@@ -49,7 +57,8 @@ def classify_subject(problem_text: str, dsl: str = "") -> SubjectType:
     """Classify a problem into one of the SubjectType disciplines.
 
     Uses keyword hit-counting; ties broken by priority
-    function > triangle > analytic > solid, default plane_geometry.
+    function > triangle > analytic > solid > probability > sequence,
+    default plane_geometry.
     """
     text = f"{problem_text or ''} {dsl or ''}"
     # Normalize for case-insensitive matching on ASCII keywords
@@ -59,16 +68,20 @@ def classify_subject(problem_text: str, dsl: str = "") -> SubjectType:
     ana = _count_hits(text, _ANALYTIC_KEYWORDS)
     sol = _count_hits(text, _SOLID_KEYWORDS)
     fn = _count_hits(text, _FUNCTION_KEYWORDS) + _count_hits(text_lower, _FUNCTION_KEYWORDS)
+    prob = _count_hits(text, _PROBABILITY_KEYWORDS)
+    seq = _count_hits(text, _SEQUENCE_KEYWORDS)
 
-    if tri == 0 and ana == 0 and sol == 0 and fn == 0:
+    if tri == 0 and ana == 0 and sol == 0 and fn == 0 and prob == 0 and seq == 0:
         return SubjectType.PLANE_GEOMETRY
 
-    # Priority: function > triangle > analytic > solid
+    # Priority: function > triangle > analytic > solid > probability > sequence
     scores = [
         (fn, SubjectType.FUNCTION_DERIVATIVE),
         (tri, SubjectType.TRIANGLE_SOLVING),
         (ana, SubjectType.ANALYTIC_GEOMETRY),
         (sol, SubjectType.SOLID_GEOMETRY),
+        (prob, SubjectType.PROBABILITY),
+        (seq, SubjectType.SEQUENCE),
     ]
     scores = [(s, st) for s, st in scores if s > 0]
     if not scores:
