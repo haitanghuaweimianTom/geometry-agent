@@ -319,6 +319,7 @@ class SolveResponse(BaseModel):
     proof: list[ProofStep]
     verified: bool
     verification_log: list[dict[str, Any]] = Field(default_factory=list)
+    error: str | None = None
 
 
 # =====================================================================================

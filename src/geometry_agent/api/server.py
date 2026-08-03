@@ -94,11 +94,18 @@ def _solve_one(
         if attempt < 2:
             retries += 1
     elapsed = time.time() - t0
+    error = None
+    if sol.confidence == 0.0 and not sol.proof:
+        if getattr(agent.client, "is_offline", False):
+            error = "LLM client is offline — no reasoning was performed"
+        else:
+            error = "Agent produced an empty proof plan"
     return {
         "solution": sol,
         "elapsed": elapsed,
         "retries": retries,
         "verified": bool(sol.verified),
+        "error": error,
     }
 
 
@@ -156,6 +163,16 @@ def solve(req: SolveRequest):
     tools = p._tools(None) if hasattr(p, "_tools") else {}
     res = _solve_one(req.text, grade, s, p, tools, req.max_calls)
     sol = res["solution"]
+    error = res.get("error")
+    if error:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": error,
+                "elapsed": round(res["elapsed"], 1),
+                "retries": res["retries"],
+            }
+        )
     ts = int(time.time())
     pdf_name = f"outputs/solve_{ts}.pdf"
     pdf_path = solution_to_pdf(req.text, sol, None, pdf_name, "几何题解答报告")
@@ -186,6 +203,15 @@ def solve_multi(req: SolveMultiRequest):
         sub_text = normalize_problem_text(sub_text)
         full_text = req.text + " " + sub_text
         res = _solve_one(full_text, grade, s, p, tools, req.max_calls)
+        error = res.get("error")
+        if error:
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": error,
+                    "part": i + 1,
+                }
+            )
         sol = res["solution"]
         results.append(
             {

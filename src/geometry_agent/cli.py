@@ -32,6 +32,9 @@ def main() -> int:
             grade=grade,
         )
         resp = solve(req)
+        if resp.error:
+            print(f"Error: {resp.error}", file=sys.stderr)
+            return 1
         out = resp.model_dump_json(indent=2)
         if args.out == "-":
             print(out)

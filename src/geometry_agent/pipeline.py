@@ -268,6 +268,17 @@ class GeometryPipeline:
         with log_step("pipeline", "solve"):
             solution = self.solver.solve(plan, graph)
 
+        # ---- Validate solution quality ----
+        error = None
+        if plan.plan and solution.confidence == 0.0:
+            error = "All proof steps failed verification"
+        elif not plan.plan:
+            agent = self._agent_for_grade(request.grade)
+            if getattr(agent.client, "is_offline", False):
+                error = "LLM client is offline — no reasoning was performed"
+            else:
+                error = "Agent produced an empty proof plan"
+
         # 6. Auto-generate LaTeX solution report PDF
         pdf_path = None
         try:
@@ -288,6 +299,7 @@ class GeometryPipeline:
             proof=solution.proof,
             verified=solution.verified,
             verification_log=solution.verification_log,
+            error=error,
         )
         resp._pdf_path = pdf_path
         return resp
