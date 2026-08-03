@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import threading
 from typing import Any, Optional
 
@@ -10,6 +11,9 @@ import sympy as sp
 from geometry_agent.types import VerifyState
 from geometry_agent.verification._models import Step, Verdict
 from geometry_agent.verification.step_parser import parse_claim
+
+
+_GEOMETRIC_KEYWORDS = ("平行", "∥", "垂直", "⊥", "共线")
 
 
 class _Result:
@@ -60,6 +64,14 @@ class SymbolicStepVerifier:
         return assumptions, eq_premises
 
     def verify(self, step: Step, premises: list[Step]) -> Verdict:
+        stmt = step.statement or ""
+        for kw in _GEOMETRIC_KEYWORDS:
+            if kw in stmt:
+                return Verdict(
+                    verified=VerifyState.UNCERTAIN,
+                    reason="geometric relation (keyword), not verified by symbolic engine",
+                )
+
         parsed = parse_claim(step.statement)
         if parsed is None:
             return Verdict(
@@ -74,16 +86,14 @@ class SymbolicStepVerifier:
         if rel is sp.Eq:
             def _compute():
                 diff = lhs - rhs
-                # Try simplify first
                 s = sp.simplify(diff, assumptions=assumptions)
                 if s == 0:
                     return s
-                # Try expand
                 e = sp.expand(diff)
                 if e == 0:
                     return e
-                # Try substituting solutions from premise equalities (best-effort, single-variable solves)
                 diff2 = diff
+                solved_subs: dict[Any, Any] = {}
                 for plhs, prhs in eq_premises:
                     eq = sp.Eq(plhs, prhs)
                     free = eq.free_symbols
@@ -98,10 +108,11 @@ class SymbolicStepVerifier:
                             if subbed == 0:
                                 return subbed
                             diff2 = subbed
-                return s
+                            solved_subs[sym] = sv
+                return s, solved_subs, diff, eq_premises
 
             res = _run_with_timeout(_compute, timeout_s)
-            return _judge_eq(res)
+            return _judge_eq(res, eq_premises, timeout_s)
         else:
             def _compute():
                 return sp.simplify(rel(lhs, rhs), assumptions=assumptions)
@@ -110,24 +121,29 @@ class SymbolicStepVerifier:
             return _judge_rel(res)
 
 
-def _judge_eq(res: _Result) -> Verdict:
+def _judge_eq(res: _Result, eq_premises=None, timeout_s: float = 0.2) -> Verdict:
     if res.timed_out:
         return Verdict(verified=VerifyState.UNCERTAIN, reason="timeout")
     if res.exc is not None:
         return Verdict(verified=VerifyState.UNCERTAIN, reason=f"simplify raised: {res.exc}")
-    diff = res.value
+    value = res.value
+    if isinstance(value, tuple) and len(value) == 4:
+        diff, solved_subs, orig_diff, all_eq_premises = value
+    else:
+        diff = value
+        solved_subs = {}
+        orig_diff = diff
+        all_eq_premises = eq_premises or []
     if diff == 0:
         return Verdict(
             verified=VerifyState.TRUE,
             evidence=f"simplified(lhs-rhs)=0 -> {diff}",
         )
-    # Detect provably non-zero: constant and non-zero, or expand gives non-zero constant
     if diff.is_constant() and diff != 0:
         return Verdict(
             verified=VerifyState.FALSE,
             evidence=f"lhs-rhs = {diff} != 0",
         )
-    # Try expanded form to see if it's a nonzero polynomial identity
     try:
         e = sp.expand(diff)
         if e.is_constant() and e != 0:
@@ -137,9 +153,6 @@ def _judge_eq(res: _Result) -> Verdict:
             )
     except Exception:
         pass
-    # Free-variable expression: diff has free symbols. For a polynomial identity
-    # claim (typical in exam solutions: algebraic identities in arbitrary variables),
-    # if the expanded form is a nonzero polynomial, the identity is FALSE.
     try:
         e = sp.expand(diff)
         if e != 0 and not getattr(e, "free_symbols", None):
@@ -147,9 +160,7 @@ def _judge_eq(res: _Result) -> Verdict:
                 verified=VerifyState.FALSE,
                 evidence=f"lhs-rhs = {e} != 0",
             )
-        # nonzero polynomial in free vars → not an identity
-        if e != 0 and bool(getattr(e, "free_symbols", set())):
-            # Test a random numeric substitution to confirm non-identity
+        if e != 0 and bool(getattr(e, "free_symbols", set())) and not all_eq_premises:
             try:
                 syms = list(e.free_symbols)
                 sub = {s: (i + 1) * sp.Rational(3, 2) for i, s in enumerate(syms)}
@@ -168,10 +179,127 @@ def _judge_eq(res: _Result) -> Verdict:
             verified=VerifyState.FALSE,
             evidence=f"lhs-rhs = {diff} != 0",
         )
+
+    numeric_verdict = _numeric_cross_check(orig_diff, all_eq_premises, solved_subs, timeout_s)
+    if numeric_verdict is not None:
+        return numeric_verdict
+
     return Verdict(
         verified=VerifyState.UNCERTAIN,
         reason=f"could not simplify difference to 0 (got {diff})",
     )
+
+
+def _numeric_cross_check(diff, eq_premises, solved_subs, timeout_s: float):
+    if not eq_premises:
+        return None
+    try:
+        reduced_diff = diff
+        for sym, val in solved_subs.items():
+            reduced_diff = reduced_diff.subs(sym, val)
+        reduced_diff = sp.simplify(reduced_diff)
+
+        eqs = []
+        all_symbols = set(reduced_diff.free_symbols)
+        for plhs, prhs in eq_premises:
+            pe = plhs - prhs
+            pe = pe.subs(solved_subs)
+            pe = sp.simplify(pe)
+            if pe == 0:
+                continue
+            eqs.append(sp.Eq(pe, 0))
+            all_symbols.update(pe.free_symbols)
+        syms = sorted(all_symbols, key=str)
+
+        if not syms:
+            val = sp.N(reduced_diff)
+            if abs(val) < 1e-10:
+                return Verdict(verified=VerifyState.TRUE, evidence="numeric cross-check passed")
+            if abs(val) > 1e-6:
+                return Verdict(verified=VerifyState.FALSE, evidence=f"numeric cross-check: diff={val} != 0")
+            return None
+
+        solutions = []
+        try:
+            sol_result = sp.solve(eqs, syms, dict=True, set=False)
+            if isinstance(sol_result, list):
+                solutions = sol_result
+            elif isinstance(sol_result, dict):
+                solutions = [sol_result]
+            else:
+                solutions = []
+        except Exception:
+            solutions = []
+
+        if solutions:
+            all_zero = True
+            any_zero = False
+            for sol in solutions:
+                try:
+                    val = sp.N(reduced_diff.subs(sol))
+                except Exception:
+                    return None
+                if abs(val) > 1e-6:
+                    return Verdict(
+                        verified=VerifyState.FALSE,
+                        evidence=f"numeric cross-check: diff={val} != 0 at satisfying point",
+                    )
+                if abs(val) < 1e-10:
+                    any_zero = True
+                else:
+                    all_zero = False
+            if all_zero and any_zero:
+                return Verdict(
+                    verified=VerifyState.TRUE,
+                    evidence="numeric cross-check passed",
+                )
+
+        try:
+            f_diff = sp.lambdify(syms, reduced_diff, modules="math")
+            f_premises = [sp.lambdify(syms, (eq.lhs - eq.rhs), modules="math") for eq in eqs]
+        except Exception:
+            return None
+
+        random.seed(42)
+
+        def _try_point(point):
+            try:
+                for f in f_premises:
+                    v = f(*point)
+                    if abs(v) > 1e-6:
+                        return None
+                return f_diff(*point)
+            except Exception:
+                return None
+
+        true_hits = 0
+        false_found = None
+        for _ in range(500):
+            point = tuple(random.uniform(-5, 5) for _ in syms)
+            dv = _try_point(point)
+            if dv is None:
+                continue
+            if abs(dv) > 1e-6:
+                false_found = dv
+                break
+            if abs(dv) < 1e-10:
+                true_hits += 1
+                if true_hits >= 5:
+                    break
+
+        if false_found is not None:
+            return Verdict(
+                verified=VerifyState.FALSE,
+                evidence=f"numeric cross-check: diff={false_found} != 0 at satisfying point",
+            )
+        if true_hits >= 5:
+            return Verdict(
+                verified=VerifyState.TRUE,
+                evidence="numeric cross-check passed",
+            )
+        return None
+    except Exception:
+        return None
 
 
 def _judge_rel(res: _Result) -> Verdict:

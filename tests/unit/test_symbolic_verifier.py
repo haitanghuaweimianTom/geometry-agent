@@ -75,3 +75,35 @@ class TestSymbolicVerifier:
         v = SymbolicStepVerifier(timeout_ms=10)
         r = v.verify(_mk("x^100 + x^99 = x^99*(x+1)"), [])
         assert r.verified in (VerifyState.TRUE, VerifyState.UNCERTAIN)
+
+    def test_geometric_keyword_returns_uncertain(self):
+        v = SymbolicStepVerifier()
+        r = v.verify(_mk("AB 平行 CD", []), [])
+        assert r.verified == VerifyState.UNCERTAIN
+        assert "geometric" in r.reason or "几何" in r.reason
+
+    def test_geometric_keyword_perpendicular(self):
+        v = SymbolicStepVerifier()
+        r = v.verify(_mk("AB ⊥ CD", []), [])
+        assert r.verified == VerifyState.UNCERTAIN
+
+    def test_geometric_keyword_collinear(self):
+        v = SymbolicStepVerifier()
+        r = v.verify(_mk("A,B,C 三点共线", []), [])
+        assert r.verified == VerifyState.UNCERTAIN
+
+    def test_algebraic_consequence_via_numeric(self):
+        v = SymbolicStepVerifier()
+        r = v.verify(
+            _mk("x = 2", ["p1", "p2"]),
+            [_premise("x + y = 3", "p1"), _premise("x - y = 1", "p2")],
+        )
+        assert r.verified == VerifyState.TRUE
+
+    def test_numeric_falsification(self):
+        v = SymbolicStepVerifier()
+        r = v.verify(
+            _mk("x = 2", ["p1"]),
+            [_premise("x = 1", "p1")],
+        )
+        assert r.verified == VerifyState.FALSE
