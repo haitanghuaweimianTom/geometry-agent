@@ -1,17 +1,19 @@
+"""Unit tests for the per-step verification factory and models."""
+
 from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
 
-from geometry_agent.types import GradeLevel
+from geometry_agent.types import GradeLevel, VerifyState
 from geometry_agent.verification import Step, StepVerifier, Verdict, build_verifier
 from geometry_agent.verification.lean_client import LeanStepVerifier
 from geometry_agent.verification.symbolic import SymbolicStepVerifier
 
 
 def test_verdict_requires_verified_field() -> None:
-    v = Verdict(verified="true", evidence="x=2", reason="algebra")
-    assert v.verified == "true"
+    v = Verdict(verified=VerifyState.TRUE, evidence="x=2", reason="algebra")
+    assert v.verified == VerifyState.TRUE
     assert v.evidence == "x=2"
     assert v.reason == "algebra"
     assert v.lean_source is None
@@ -49,8 +51,41 @@ def test_build_verifier_senior_returns_symbolic() -> None:
 def test_build_verifier_competition_with_endpoint_returns_lean() -> None:
     v = build_verifier(GradeLevel.COMPETITION, lean_endpoint="http://localhost:8080")
     assert isinstance(v, LeanStepVerifier)
+    assert v.timeout_s == 10
 
 
 def test_build_verifier_competition_without_endpoint_falls_back_to_symbolic() -> None:
     v = build_verifier(GradeLevel.COMPETITION, lean_endpoint=None)
     assert isinstance(v, SymbolicStepVerifier)
+
+
+def test_build_verifier_accepts_lean_timeout_s() -> None:
+    v = build_verifier(
+        GradeLevel.COMPETITION,
+        lean_endpoint="http://localhost:8080",
+        lean_timeout_s=42,
+    )
+    assert isinstance(v, LeanStepVerifier)
+    assert v.timeout_s == 42
+
+
+def test_symbolic_verifier_returns_uncertain_stub() -> None:
+    v = SymbolicStepVerifier()
+    s = Step(id="s1", statement="AB=CD")
+    out = v.verify(s, [])
+    assert out.verified == VerifyState.UNCERTAIN
+
+
+def test_lean_verifier_returns_uncertain_stub() -> None:
+    v = LeanStepVerifier(endpoint="http://x", timeout_s=5)
+    s = Step(id="s1", statement="AB=CD")
+    out = v.verify(s, [])
+    assert out.verified == VerifyState.UNCERTAIN
+    assert v.timeout_s == 5
+
+
+def test_parse_claim_raises_not_implemented() -> None:
+    from geometry_agent.verification.step_parser import parse_claim
+
+    with pytest.raises(NotImplementedError):
+        parse_claim("AB = CD")

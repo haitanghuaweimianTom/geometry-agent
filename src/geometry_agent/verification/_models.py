@@ -1,15 +1,19 @@
+"""Step-verification primitives, Pydantic models shared across verifier backends."""
+
 from __future__ import annotations
 
-from typing import Literal
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from geometry_agent.types import VerifyState
+
 
 class Verdict(BaseModel):
-    verified: Literal["true", "false", "uncertain"]
+    verified: VerifyState
     evidence: str = ""
     reason: str = ""
-    lean_source: str | None = None
+    lean_source: Optional[str] = None
 
 
 class Step(BaseModel):
