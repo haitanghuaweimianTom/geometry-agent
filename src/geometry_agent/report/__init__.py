@@ -726,12 +726,51 @@ def _clean_statement(text: str) -> str:
     return s.strip()
 
 
+def _verification_badge(status: str) -> str:
+    """Return a LaTeX badge for the given verification_status value."""
+    s = (status or "unknown").lower()
+    if s == "true":
+        return r"{\color{verifiedgreen}\checkmark}"
+    if s == "false":
+        return r"{\color{verifiedred}\ding{55}}"
+    if s == "uncertain":
+        return r"{\color{verifiedorange}\textbf{!}}"
+    return r"{\color{gray}$\cdot$}"
+
+
+def _verification_summary_line(proof: list[ProofStep]) -> list[str]:
+    """Render a Chinese verification statistics line for the report header."""
+    counts = {"true": 0, "false": 0, "uncertain": 0, "unknown": 0}
+    for st in proof:
+        s = (getattr(st, "verification_status", None) or "unknown").lower()
+        if s in counts:
+            counts[s] += 1
+        else:
+            # Back-compat: fall back to bool verified
+            if getattr(st, "verified", False):
+                counts["true"] += 1
+            else:
+                counts["unknown"] += 1
+    return [
+        r"\noindent\small 验证统计: "
+        f"{counts['true']} 步已证 "
+        r"{\color{verifiedgreen}\checkmark}, "
+        f"{counts['uncertain']} 步存疑 "
+        r"{\color{verifiedorange}\textbf{!}}, "
+        f"{counts['false']} 步错误 "
+        r"{\color{verifiedred}\ding{55}}, "
+        f"{counts['unknown']} 步未验证."
+    ]
+
+
 def _proof_block(proof: list[ProofStep]) -> list[str]:
     """Render proof steps in formal style.
 
     Each step is a numbered item. The statement is rendered inline (mixed
     text+math). The reason follows on the next line in smaller italic text.
-    No verification marks (per user request).
+    A small verification badge (✓/✗/!/·) is shown next to each step based on
+    the step's ``verification_status`` (back-compat with legacy bool
+    ``verified`` field).
     """
     lines: list[str] = []
     # Filter out empty/JSON-leak/raw-LLM-prose steps
@@ -744,6 +783,11 @@ def _proof_block(proof: list[ProofStep]) -> list[str]:
             if reason == "raw LLM output" and _is_raw_llm_garbage(cleaned):
                 continue
             clean_steps.append((st, cleaned))
+    # Statistics line
+    lines += _verification_summary_line(
+        [st for st, _ in clean_steps] if clean_steps else proof
+    )
+    lines.append("")
     if not clean_steps:
         lines.append(r"\textit{（未生成解答步骤）}")
         return lines
@@ -752,12 +796,21 @@ def _proof_block(proof: list[ProofStep]) -> list[str]:
         r"\begin{enumerate}[label={\small\textcircled{\arabic*}}, leftmargin=2.8em, itemsep=8pt, topsep=4pt]"
     )
     for st, cleaned in clean_steps:
+        badge = _verification_badge(getattr(st, "verification_status", None))
         stmt = _format_inline(cleaned)
         reason = _format_inline(_clean_statement(st.reason)) if st.reason else ""
-        lines.append(rf"\item {stmt}")
+        vr = _format_inline(_clean_statement(getattr(st, "verifier_reason", "") or ""))
+        lines.append(rf"\item {badge}\enspace {stmt}")
         if reason:
             lines.append(
                 rf"\par\noindent\hspace*{{1.4em}}{{\small\textit{{理由：}}{reason}}}"
+            )
+        if vr and vr != reason:
+            color = "verifiedred" if (getattr(st, "verification_status", None) == "false") else (
+                "verifiedorange" if (getattr(st, "verification_status", None) == "uncertain") else "gray"
+            )
+            lines.append(
+                rf"\par\noindent\hspace*{{1.4em}}{{\small\textcolor{{{color}}}{{\textit{{验证说明：}}{vr}}}}}"
             )
     lines.append(r"\end{enumerate}")
     return lines
@@ -775,6 +828,10 @@ def _preamble(title: str) -> list[str]:
         r"\usepackage{geometry}",
         r"\geometry{a4paper, margin=2.2cm}",
         r"\usepackage{xcolor}",
+        r"\usepackage{pifont}",
+        r"\definecolor{verifiedgreen}{RGB}{0,128,0}",
+        r"\definecolor{verifiedred}{RGB}{200,0,0}",
+        r"\definecolor{verifiedorange}{RGB}{220,120,0}",
         r"\usepackage{tikz}",
         r"\usepackage{amsmath, amssymb, amsthm}",
         r"\usepackage{booktabs}",

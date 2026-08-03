@@ -203,6 +203,7 @@ def parse_plan(content: str, goal: Any = None) -> ProofPlan:
                     statement=(content or "")[:500],
                     reason="raw LLM output",
                     verified=False,
+                    verification_status="unknown",
                 )
             ],
         )
@@ -213,6 +214,14 @@ def parse_plan(content: str, goal: Any = None) -> ProofPlan:
             continue
         s = dict(s)
         s.setdefault("step", i)
+        if "verification_status" not in s:
+            v = s.get("verified", False)
+            if v is True or v == "true" or getattr(v, "value", "") == "true":
+                s["verification_status"] = "true"
+            elif v is False or v == "false" or getattr(v, "value", "") == "false":
+                s["verification_status"] = "unknown"
+            elif v == "uncertain" or getattr(v, "value", "") == "uncertain":
+                s["verification_status"] = "uncertain"
         try:
             steps.append(ProofStep(**s))
         except Exception:
@@ -222,6 +231,8 @@ def parse_plan(content: str, goal: Any = None) -> ProofPlan:
                     statement=str(s.get("statement", "")),
                     reason=str(s.get("reason", "")),
                     verified=bool(s.get("verified", False)),
+                    verification_status=str(s.get("verification_status", "unknown") or "unknown"),
+                    verifier_reason=str(s.get("verifier_reason", "") or ""),
                 )
             )
 
@@ -249,23 +260,62 @@ def parse_plan(content: str, goal: Any = None) -> ProofPlan:
 
 
 def _plan_from_tool_log(tool_log: list[ToolCall], goal: Any) -> ProofPlan:
-    """Build a fallback ProofPlan from successful verify/solve tool calls.
+    """Build a fallback ProofPlan from successful verify/solve/claim_step tool calls.
 
     Used when the LLM exhausts ``max_tool_calls`` without emitting a final JSON
-    plan. Each successful ``verify`` becomes a verified step; ``solve`` /
-    ``execute_code`` results are summarised, and a best-effort final answer is
-    extracted from the last successful computation.
+    plan. Each successful ``verify``/``solve``/``execute_code``/``claim_step``
+    becomes a step, with verification_status threaded through from the
+    verification middleware result. FALSE-claim steps are surfaced as
+    contradictory entries so the report can render an ✗ mark.
     """
     steps: list[ProofStep] = []
     i = 0
     last_numeric_answer = ""
+    pending_claims: dict[str, dict[str, Any]] = {}
     for tc in tool_log:
         res = tc.result
+        if not isinstance(res, dict):
+            continue
+        status = res.get("status", "")
+        vstatus = res.get("verification_status", "")
+        v = res.get("verified")
+        step_id = res.get("step_id")
+        if tc.name == "claim_step":
+            if step_id:
+                pending_claims[step_id] = res
+            if status in ("verified", "verified_uncertain"):
+                i += 1
+                stmt = (res.get("statement") or step_id or "").strip() or f"步骤 {step_id or i}"
+                just = res.get("justification") or res.get("reason") or res.get("evidence") or "claim_step 工具确认"
+                if vstatus == "uncertain":
+                    stmt = f"(tentative) {stmt}"
+                    reason = f"claim_step 判定存疑（LLM 仲裁）: {res.get('reason') or res.get('evidence') or ''}".strip()
+                    bv = False
+                else:
+                    reason = f"claim_step 验证通过: {res.get('evidence') or res.get('reason') or ''}".strip(" :")
+                    bv = True
+                steps.append(ProofStep(
+                    step=i, statement=stmt, reason=reason, verified=bv,
+                    verification_status=vstatus or ("true" if bv else "uncertain"),
+                    verifier_reason=res.get("reason") or res.get("evidence") or "",
+                    tool_call=tc,
+                ))
+            elif status == "retry_failed":
+                i += 1
+                stmt = (res.get("statement") or step_id or "").strip() or f"步骤 {step_id or i}"
+                reason = f"矛盾: 该步骤验证失败 — {res.get('reason') or '未通过验证'}"
+                steps.append(ProofStep(
+                    step=i, statement=f"✗ {stmt}", reason=reason, verified=False,
+                    verification_status="false",
+                    verifier_reason=res.get("reason") or "",
+                    tool_call=tc,
+                ))
+            elif status == "retry":
+                pass
+            continue
         ok = False
-        if isinstance(res, dict):
-            v = res.get("verified")
-            if v is True or v == "true" or getattr(v, "value", "") == "true":
-                ok = True
+        if v is True or v == "true" or getattr(v, "value", "") == "true":
+            ok = True
         if not ok:
             continue
         i += 1
@@ -281,7 +331,6 @@ def _plan_from_tool_log(tool_log: list[ToolCall], goal: Any) -> ProofPlan:
             out = (res.get("output", "") if isinstance(res, dict) else "")
             stmt = f"代码计算: {out.strip()[:80]}" if out.strip() else "代码计算"
             reason = "execute_code 工具确认"
-            # try to capture a numeric answer from the last output line
             if out.strip():
                 last_line = [l for l in out.strip().splitlines() if l.strip()][-1]
                 last_numeric_answer = last_line[:60]
@@ -290,18 +339,20 @@ def _plan_from_tool_log(tool_log: list[ToolCall], goal: Any) -> ProofPlan:
             reason = f"{tc.name} 工具确认"
         steps.append(ProofStep(
             step=i, statement=stmt, reason=reason, verified=True,
+            verification_status=vstatus or "true",
+            verifier_reason=res.get("reason") or res.get("evidence") or "",
             tool_call=tc,
         ))
     gs = goal_spec(goal)
-    # If we found a numeric answer in code output, add a concluding step.
     if last_numeric_answer and steps:
         i += 1
         steps.append(ProofStep(
             step=i, statement=f"计算结果: {last_numeric_answer}",
             reason="由 execute_code 输出", verified=True,
+            verification_status="true",
         ))
     if not steps and gs.statement:
-        steps.append(ProofStep(step=1, statement=gs.statement, reason="未解出", verified=False))
+        steps.append(ProofStep(step=1, statement=gs.statement, reason="未解出", verified=False, verification_status="unknown"))
     return ProofPlan(plan=steps, goal=gs, tool_calls=tool_log)
 
 

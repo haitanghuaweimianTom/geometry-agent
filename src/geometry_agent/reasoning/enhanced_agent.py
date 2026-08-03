@@ -395,20 +395,27 @@ class EnhancedReasoningAgent:
                             self.verified_steps[step_id] = step
                             result = {
                                 "verified": True,
+                                "verification_status": "true",
                                 "step_id": step_id,
                                 "evidence": verdict.evidence,
+                                "reason": verdict.reason,
                                 "status": "verified",
+                                "statement": step.statement,
+                                "justification": step.justification,
                             }
                             self._step_retries.pop(step_id, None)
                         elif attempt < max_r:
                             # Ask LLM to regenerate this step (milder than full failure).
                             result = {
                                 "verified": False,
+                                "verification_status": "false",
                                 "reason": verdict.reason or verdict.evidence or "verification failed",
                                 "retry": attempt + 1,
                                 "failures": attempt + 1,
                                 "status": "retry",
                                 "step_id": step_id,
+                                "statement": step.statement,
+                                "justification": step.justification,
                             }
                         else:
                             # Exhausted retries — fall back to LLM judge if enabled.
@@ -419,21 +426,28 @@ class EnhancedReasoningAgent:
                                 judge_verdict = None
                             if judge_verdict is not None and judge_verdict.verified in (VerifyState.TRUE, VerifyState.UNCERTAIN):
                                 self.verified_steps[step_id] = step
+                                is_uncertain = judge_verdict.verified == VerifyState.UNCERTAIN
                                 result = {
-                                    "verified": "uncertain" if judge_verdict.verified == VerifyState.UNCERTAIN else True,
+                                    "verified": not is_uncertain,
+                                    "verification_status": "uncertain" if is_uncertain else "true",
                                     "step_id": step_id,
                                     "evidence": judge_verdict.evidence,
                                     "reason": judge_verdict.reason,
                                     "status": "verified_uncertain",
+                                    "statement": step.statement,
+                                    "justification": step.justification,
                                 }
                                 self._step_retries.pop(step_id, None)
                             else:
                                 result = {
                                     "verified": False,
-                                    "reason": judge_verdict.reason or verdict.reason,
+                                    "verification_status": "false",
+                                    "reason": (judge_verdict.reason if judge_verdict else None) or verdict.reason or "verification failed",
                                     "retry": attempt + 1,
                                     "status": "retry_failed",
                                     "step_id": step_id,
+                                    "statement": step.statement,
+                                    "justification": step.justification,
                                 }
 
                     tool_log.append(ToolCall(name=name, args=args, result=result))
@@ -555,6 +569,7 @@ class EnhancedReasoningAgent:
             content = msg.get("content") or ""
             plan = parse_plan(content, goal)
             plan.tool_calls = tool_log
+            plan = self._enrich_plan_with_verdicts(plan, tool_log)
             plan.summary = _clean_summary(plan.summary)
             # Keep only meaningful LLM-written key equations (no code garbage)
             plan.key_equations = [
@@ -565,6 +580,71 @@ class EnhancedReasoningAgent:
 
         # Fallback: synthesize from tool log
         plan = self._synthesize_plan(tool_log, goal)
+        return plan
+
+    # ------------------------------------------------------------------ #
+    # Plan enrichment: thread verification verdicts from tool_log onto
+    # ProofStep entries produced by parse_plan / _synthesize_plan.
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _enrich_plan_with_verdicts(plan: ProofPlan, tool_log: list[ToolCall]) -> ProofPlan:
+        """Populate ``verification_status`` / ``verifier_reason`` for each step.
+
+        We look at ``claim_step`` entries in the tool log and mark any matching
+        proof step with the verdict produced by the verification middleware.
+        Steps not matched by a claim_step verdict keep their defaults
+        ("unknown"), or inherit the pre-existing boolean ``verified`` value
+        (True -> "true"). UNCERTAIN verdicts are marked (tentative); FALSE
+        verdicts are marked as contradictory by prefixing "✗" to the statement.
+        """
+        claim_verdicts: list[dict[str, Any]] = []
+        for tc in tool_log:
+            if tc.name != "claim_step" or not isinstance(tc.result, dict):
+                continue
+            claim_verdicts.append(tc.result)
+
+        # Index claim results by step_id and by statement text for fuzzy match
+        by_id: dict[str, dict[str, Any]] = {}
+        by_stmt: list[tuple[str, dict[str, Any]]] = []
+        for cr in claim_verdicts:
+            sid = cr.get("step_id")
+            if sid:
+                # latest wins
+                by_id[sid] = cr
+            stmt = (cr.get("statement") or "").strip()
+            if stmt:
+                by_stmt.append((stmt, cr))
+
+        def _match_verdict(stmt_text: str, idx: int) -> dict[str, Any] | None:
+            for sid_key, cr in by_id.items():
+                if sid_key == f"s{idx}" or sid_key == str(idx):
+                    return cr
+            s_norm = (stmt_text or "").strip()
+            for cstmt, cr in by_stmt:
+                if cstmt and (cstmt in s_norm or s_norm in cstmt):
+                    return cr
+            return None
+
+        for idx, st in enumerate(plan.plan, start=1):
+            vstatus = getattr(st, "verification_status", "unknown") or "unknown"
+            if vstatus != "unknown" and vstatus != "":
+                continue
+            cr = _match_verdict(st.statement, idx)
+            if cr is None:
+                # Inherit from boolean verified flag when present
+                if st.verified:
+                    st.verification_status = "true"
+                continue
+            vs = cr.get("verification_status") or (
+                "true" if cr.get("verified") is True else
+                "false" if cr.get("verified") is False else "unknown"
+            )
+            st.verification_status = vs
+            st.verifier_reason = cr.get("reason") or cr.get("evidence") or ""
+            if vs == "false" and not st.statement.startswith("✗"):
+                st.statement = f"✗ {st.statement}"
+            elif vs == "uncertain" and not st.statement.startswith("(tentative)"):
+                st.statement = f"(tentative) {st.statement}"
         return plan
 
     # ------------------------------------------------------------------ #
@@ -654,7 +734,8 @@ class EnhancedReasoningAgent:
     def _synthesize_plan(self, tool_log: list[ToolCall], goal: str) -> ProofPlan:
         """Build a fallback ProofPlan from successful tool calls."""
         from .cot import _plan_from_tool_log
-        return _plan_from_tool_log(tool_log, goal)
+        plan = _plan_from_tool_log(tool_log, goal)
+        return self._enrich_plan_with_verdicts(plan, tool_log)
 
     # ------------------------------------------------------------------ #
     # Experience extraction

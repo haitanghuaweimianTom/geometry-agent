@@ -62,6 +62,7 @@ def _tot_dfs(client, dsl, problem, goal, tools, path, max_depth, tool_log):
                 statement=br.get("statement", sub_goal or ""),
                 reason=br.get("reason", "tot branch verified"),
                 verified=True,
+                verification_status="true",
                 tool_call=ToolCall(name="verify", args=verify_args) if verify_args else None,
             )
             merged = [step] + list(sub.plan or [])

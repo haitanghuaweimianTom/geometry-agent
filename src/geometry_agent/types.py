@@ -245,6 +245,8 @@ class ProofStep(BaseModel):
     statement: str
     reason: str = ""
     verified: bool = False
+    verification_status: str = "unknown"
+    verifier_reason: str = ""
     tool_call: Optional[ToolCall] = None
 
 
