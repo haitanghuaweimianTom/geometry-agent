@@ -117,6 +117,40 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "claim_step",
+            "description": (
+                "Assert a proof-step conclusion that must be verified before proceeding. "
+                "Junior/senior modes verify algebraically; competition mode verifies via Lean. "
+                "Call this for every non-trivial conclusion, not for raw arithmetic."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "step_id": {
+                        "type": "string",
+                        "description": "Unique id for this step, e.g. \"s1\", \"s2\".",
+                    },
+                    "statement": {
+                        "type": "string",
+                        "description": "The conclusion being asserted (e.g. \"AB/AC = AE/AD\").",
+                    },
+                    "premise_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Ids of previously verified steps this depends on.",
+                    },
+                    "justification": {
+                        "type": "string",
+                        "description": "Which lemma/method/axiom justifies the step (e.g. \"相似三角形AA\").",
+                    },
+                },
+                "required": ["step_id", "statement", "justification"],
+            },
+        },
+    },
 ]
 
 _TOOL_NAMES = {t["function"]["name"] for t in TOOL_SCHEMAS}
@@ -132,6 +166,10 @@ _EXTENDED_TOOL_NAMES: set[str] = {
     "projective_method",
 }
 _TOOL_NAMES |= _EXTENDED_TOOL_NAMES
+
+
+def claim_step(**kwargs: Any) -> dict[str, Any]:
+    return {"status": "pending_verification", "step": kwargs}
 
 
 def _serialize(value: Any) -> Any:
@@ -175,4 +213,4 @@ def dispatch(tool_name: str, args: Any, tools_dict: dict[str, Any]) -> Any:
     return _serialize(result)
 
 
-__all__ = ["TOOL_SCHEMAS", "dispatch"]
+__all__ = ["TOOL_SCHEMAS", "claim_step", "dispatch"]

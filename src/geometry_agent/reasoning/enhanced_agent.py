@@ -36,7 +36,7 @@ from .llm_client import LLMClient
 from .prompt_builder import build_enhanced_prompt
 from .prompts import fewshot_for, fewshot_for_subject
 from .reflection import reflect
-from .tools import TOOL_SCHEMAS, dispatch
+from .tools import TOOL_SCHEMAS, claim_step, dispatch
 
 
 def _clean_summary(text: str) -> str:
@@ -546,6 +546,8 @@ class EnhancedReasoningAgent:
             merged.setdefault(name, fn)
         if "reflect" not in merged:
             merged["reflect"] = self._make_reflect_tool()
+        if "claim_step" not in merged:
+            merged["claim_step"] = claim_step
         return merged
 
     def _degrade_reason(

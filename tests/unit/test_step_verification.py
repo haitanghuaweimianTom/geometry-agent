@@ -89,3 +89,16 @@ def test_parse_claim_raises_not_implemented() -> None:
 
     with pytest.raises(NotImplementedError):
         parse_claim("AB = CD")
+
+
+def test_claim_step_tool_schema_exists():
+    from geometry_agent.reasoning.tools import TOOL_SCHEMAS
+    names = [s["function"]["name"] for s in TOOL_SCHEMAS]
+    assert "claim_step" in names
+    schema = next(s["function"] for s in TOOL_SCHEMAS if s["function"]["name"] == "claim_step")
+    props = schema["parameters"]["properties"]
+    assert "statement" in props
+    assert "step_id" in props
+    assert "premise_ids" in props
+    assert "justification" in props
+    assert set(schema["parameters"]["required"]) == {"step_id", "statement", "justification"}
