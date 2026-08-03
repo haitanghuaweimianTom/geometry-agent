@@ -14,8 +14,9 @@ Key features:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
+from ..types import GradeLevel
 from .prompts import ENHANCED_SYSTEM_PROMPT
 
 
@@ -168,6 +169,7 @@ def build_enhanced_prompt(
     fewshot: str,
     experience: str = "",
     exploration_mode: bool = False,
+    grade: Optional[GradeLevel] = None,
 ) -> list[dict[str, Any]]:
     """Assemble the chat messages for the enhanced reasoning loop.
 
@@ -221,6 +223,19 @@ def build_enhanced_prompt(
     if exploration_mode:
         mode_block = EXPLORATION_PROMPT + "\n"
 
+    # ---- Assemble verification-contract block ----
+    verification_contract = ""
+    if grade is not None:
+        base_contract = (
+            "[验证契约]\n"
+            "每得出一个非平凡结论(非单纯算术结果), 必须先调用 claim_step 声明该结论, "
+            "等待验证通过(✓)后再继续下一步。\n"
+            "验证失败会返回具体原因, 请修正重述; 连续3次失败将由审查员裁决。\n"
+        )
+        if grade is GradeLevel.COMPETITION:
+            base_contract += "(竞赛模式将使用 Lean 形式化验证)\n"
+        verification_contract = base_contract + "\n"
+
     # ---- Assemble instructions ----
     if exploration_mode:
         instructions = (
@@ -271,6 +286,7 @@ def build_enhanced_prompt(
         + knowledge_block
         + experience_block
         + heuristic_block
+        + verification_contract
         + "[Context]\n"
         f"# Geometry DSL\n{dsl}\n\n"
         f"# Problem\n{problem}\n\n"

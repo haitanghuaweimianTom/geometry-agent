@@ -37,6 +37,40 @@ from .prompt_builder import build_enhanced_prompt
 from .prompts import fewshot_for, fewshot_for_subject
 from .reflection import reflect
 from .tools import TOOL_SCHEMAS, claim_step, dispatch
+from ..verification import build_verifier, Step, Verdict, VerifyState
+from ..verification.llm_judge import LLMJudge
+
+
+def _verify_and_retry(verifier, judge, step, premises, max_retries=3):
+    """Run verifier up to (max_retries+1) times; after exhaustion call judge.
+
+    This is a pure helper (no I/O, no LLM calls) intended to be easy to unit
+    test. It calls ``verifier.verify`` up to ``max_retries + 1`` times on the
+    same step/premises. If any call returns TRUE, it returns that verdict
+    immediately. If all return FALSE/UNCERTAIN and ``judge`` is provided, the
+    judge is called as a fallback.
+
+    The LLM-driven retry loop (where the model regenerates the step after
+    failure feedback) lives in :meth:`EnhancedReasoningAgent._run_feedback_loop`
+    and does not use this helper directly; the helper is exposed so it can be
+    unit-tested in isolation and reused by other entry points.
+
+    Returns ``(Verdict, retries_used)`` where ``retries_used`` is the number of
+    extra verifier invocations beyond the first (0 on first-try success).
+    """
+    failures: list[str] = []
+    verdict: Verdict | None = None
+    for attempt in range(max_retries + 1):
+        verdict = verifier.verify(step, premises)
+        if verdict.verified == VerifyState.TRUE:
+            return verdict, attempt
+        if verdict.reason:
+            failures.append(verdict.reason)
+    if judge is not None:
+        verdict = judge.judge(step, premises, failures)
+        return verdict, max_retries
+    assert verdict is not None
+    return verdict, max_retries
 
 
 def _clean_summary(text: str) -> str:
@@ -83,6 +117,26 @@ class EnhancedReasoningAgent:
         self.experience_memory = experience_memory or ExperienceMemory()
         self.client = LLMClient(self.config)
 
+        # ---- Verification infrastructure ----
+        vcfg = getattr(self.config, "verification", None) or {}
+        if not isinstance(vcfg, dict):
+            vcfg = {
+                "lean_endpoint": getattr(vcfg, "lean_endpoint", None),
+                "symbolic_timeout_ms": getattr(vcfg, "symbolic_timeout_ms", None),
+                "max_retries": getattr(vcfg, "max_retries", None),
+            }
+        lean_endpoint = vcfg.get("lean_endpoint") or "http://10.42.0.124:9407"
+        symbolic_timeout_ms = vcfg.get("symbolic_timeout_ms") or 200
+        self.verification_max_retries = int(vcfg.get("max_retries") or 3)
+        self.verifier = build_verifier(
+            self.grade,
+            lean_endpoint=lean_endpoint,
+            symbolic_timeout_ms=symbolic_timeout_ms,
+        )
+        self.llm_judge = LLMJudge(self.client)
+        self.verified_steps: dict[str, Step] = {}
+        self._step_retries: dict[str, int] = {}
+
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
@@ -123,6 +177,7 @@ class EnhancedReasoningAgent:
             dsl=dsl, problem=problem, goal=goal,
             knowledge=knowledge_text, subject=subject, fewshot=fewshot,
             experience=experience_text, exploration_mode=False,
+            grade=self.grade,
         )
         plan = self._run_feedback_loop(messages, effective, goal)
 
@@ -169,6 +224,7 @@ class EnhancedReasoningAgent:
             knowledge="",  # No knowledge in exploration mode
             subject=subject, fewshot=fewshot,
             experience=experience_text, exploration_mode=True,
+            grade=self.grade,
         )
         # Add a context message about what failed
         messages.append({
@@ -211,6 +267,7 @@ class EnhancedReasoningAgent:
             dsl=dsl, problem=problem, goal=goal,
             knowledge=knowledge_text, subject=subject, fewshot=fewshot,
             experience=experience_text, exploration_mode=False,
+            grade=GradeLevel.SENIOR,
         )
         messages.append({
             "role": "user",
@@ -313,12 +370,91 @@ class EnhancedReasoningAgent:
                     except Exception:
                         args = {}
                     result = dispatch(name, args, tools_dict)
+
+                    # ---- Verification middleware for claim_step ----
+                    is_retry_round = False
+                    if name == "claim_step" and isinstance(result, dict) and result.get("status") == "pending_verification":
+                        step_data = result.get("step", {}) or {}
+                        step_id = step_data.get("step_id") or f"s{len(self.verified_steps)+1}"
+                        step = Step(
+                            id=step_id,
+                            statement=step_data.get("statement", ""),
+                            premise_ids=list(step_data.get("premise_ids", []) or []),
+                            justification=step_data.get("justification", ""),
+                        )
+                        premises = [
+                            self.verified_steps[pid]
+                            for pid in step.premise_ids
+                            if pid in self.verified_steps
+                        ]
+
+                        self._step_retries[step_id] = self._step_retries.get(step_id, -1) + 1
+                        attempt = self._step_retries[step_id]
+                        max_r = self.verification_max_retries
+
+                        verdict = self.verifier.verify(step, premises)
+
+                        if verdict.verified == VerifyState.TRUE:
+                            self.verified_steps[step_id] = step
+                            result = {
+                                "verified": True,
+                                "step_id": step_id,
+                                "evidence": verdict.evidence,
+                                "status": "verified",
+                            }
+                            self._step_retries.pop(step_id, None)
+                        elif attempt < max_r:
+                            # Ask LLM to regenerate this step (milder than full failure).
+                            result = {
+                                "verified": False,
+                                "reason": verdict.reason or verdict.evidence or "verification failed",
+                                "retry": attempt + 1,
+                                "failures": attempt + 1,
+                                "status": "retry",
+                                "step_id": step_id,
+                            }
+                        else:
+                            # Exhausted retries — fall back to LLM judge (stub for Task 6).
+                            failures = [verdict.reason or verdict.evidence or "verification failed"]
+                            judge_verdict = self.llm_judge.judge(step, premises, failures)
+                            if judge_verdict.verified in (VerifyState.TRUE, VerifyState.UNCERTAIN):
+                                self.verified_steps[step_id] = step
+                                result = {
+                                    "verified": "uncertain" if judge_verdict.verified == VerifyState.UNCERTAIN else True,
+                                    "step_id": step_id,
+                                    "evidence": judge_verdict.evidence,
+                                    "reason": judge_verdict.reason,
+                                    "status": "verified_uncertain",
+                                }
+                                self._step_retries.pop(step_id, None)
+                            else:
+                                result = {
+                                    "verified": False,
+                                    "reason": judge_verdict.reason or verdict.reason,
+                                    "retry": attempt + 1,
+                                    "status": "retry_failed",
+                                    "step_id": step_id,
+                                }
+
                     tool_log.append(ToolCall(name=name, args=args, result=result))
                     total_calls += 1
 
                     # Build structured feedback message
                     feedback = self._build_feedback(name, result)
                     messages.append(feedback)
+
+                    # ---- Retry nudge for failed claim_step (mild, targeted) ----
+                    if isinstance(result, dict) and result.get("status") == "retry":
+                        messages.append({
+                            "role": "user",
+                            "content": (
+                                f"第{result['retry']}次验证失败: {result.get('reason','')}\n"
+                                "请重新调用 claim_step 修正该步的声明后再继续。不要跳过此步。"
+                            ),
+                        })
+                        # Do not count this as a normal success/failure; do not trigger
+                        # the generic consecutive-failure nudge for single-step retries.
+                        is_retry_round = True
 
                     # ---- Duplicate detection ----
                     call_sig = (name, json.dumps(args, sort_keys=True, default=str)[:200])
@@ -328,63 +464,68 @@ class EnhancedReasoningAgent:
                         seen_calls.append(call_sig)
                         duplicate_count = 0
 
-                    # Track consecutive failures / successes
-                    if self._is_failure(result):
-                        consecutive_failures += 1
-                        consecutive_successes = 0
+                    if not is_retry_round:
+                        # Track consecutive failures / successes
+                        if self._is_failure(result):
+                            consecutive_failures += 1
+                            consecutive_successes = 0
+                        else:
+                            consecutive_successes += 1
+                            consecutive_failures = 0
+
+                        # Inject reflection nudge after 3 consecutive failures
+                        if consecutive_failures >= 3:
+                            messages.append({
+                                "role": "user",
+                                "content": (
+                                    f"已连续{consecutive_failures}次工具调用失败。"
+                                    "请用 reflect 工具总结失败原因, 然后换一种完全不同的方法。"
+                                    "不要重复已经失败的思路。"
+                                ),
+                            })
+                            consecutive_failures = 0
+
+                        # ---- Duplicate nudge: LLM is repeating the same call ----
+                        if duplicate_count >= 1:
+                            messages.append({
+                                "role": "user",
+                                "content": (
+                                    "你刚才重复执行了相同的计算。请不要重复, 直接进行下一步:\n"
+                                    "- 如果坐标已求出, 请继续求交点F的坐标\n"
+                                    "- 如果所有点坐标已知, 请用鞋带公式算面积\n"
+                                    "- 如果面积已算出, 请算面积比并输出最终JSON\n"
+                                    "不要重复已经完成的计算!"
+                                ),
+                            })
+                            duplicate_count = 0
+
+                        # Inject progress nudge after 3 consecutive successes
+                        if consecutive_successes == 3:
+                            messages.append({
+                                "role": "user",
+                                "content": (
+                                    "你已成功完成3次计算。请检查你的解题进度:\n"
+                                    "- 是否还有未完成的步骤(如求交点、算面积)? 如有, 请继续。\n"
+                                    "- 如果所有必要计算都已完成, 请输出 JSON 解答。"
+                                ),
+                            })
+                        elif consecutive_successes >= 6:
+                            messages.append({
+                                "role": "user",
+                                "content": (
+                                    "已计算多次, 请立即输出最终 JSON 解答, 不要再调用工具。"
+                                    '格式: {"plan":[{"step":1,"statement":"结论",'
+                                    '"reason":"依据","verified":true}],'
+                                    '"goal":{"kind":"Prove","statement":"..."},'
+                                    '"summary":"用2~3句中文总结核心方法与关键观察",'
+                                    '"key_equations":["证明主线上2~4个核心公式"]}'
+                                ),
+                            })
+                            consecutive_successes = 0
                     else:
-                        consecutive_successes += 1
-                        consecutive_failures = 0
-
-                    # Inject reflection nudge after 3 consecutive failures
-                    if consecutive_failures >= 3:
-                        messages.append({
-                            "role": "user",
-                            "content": (
-                                f"已连续{consecutive_failures}次工具调用失败。"
-                                "请用 reflect 工具总结失败原因, 然后换一种完全不同的方法。"
-                                "不要重复已经失败的思路。"
-                            ),
-                        })
-                        consecutive_failures = 0
-
-                    # ---- Duplicate nudge: LLM is repeating the same call ----
-                    if duplicate_count >= 1:
-                        messages.append({
-                            "role": "user",
-                            "content": (
-                                "你刚才重复执行了相同的计算。请不要重复, 直接进行下一步:\n"
-                                "- 如果坐标已求出, 请继续求交点F的坐标\n"
-                                "- 如果所有点坐标已知, 请用鞋带公式算面积\n"
-                                "- 如果面积已算出, 请算面积比并输出最终JSON\n"
-                                "不要重复已经完成的计算!"
-                            ),
-                        })
+                        # Reset duplicate count on retry rounds so retries of a
+                        # corrected claim_step don't trip the duplicate nudge.
                         duplicate_count = 0
-
-                    # Inject progress nudge after 3 consecutive successes
-                    if consecutive_successes == 3:
-                        messages.append({
-                            "role": "user",
-                            "content": (
-                                "你已成功完成3次计算。请检查你的解题进度:\n"
-                                "- 是否还有未完成的步骤(如求交点、算面积)? 如有, 请继续。\n"
-                                "- 如果所有必要计算都已完成, 请输出 JSON 解答。"
-                            ),
-                        })
-                    elif consecutive_successes >= 6:
-                        messages.append({
-                            "role": "user",
-                            "content": (
-                                "已计算多次, 请立即输出最终 JSON 解答, 不要再调用工具。"
-                                '格式: {"plan":[{"step":1,"statement":"结论",'
-                                '"reason":"依据","verified":true}],'
-                                '"goal":{"kind":"Prove","statement":"..."},'
-                                '"summary":"用2~3句中文总结核心方法与关键观察",'
-                                '"key_equations":["证明主线上2~4个核心公式"]}'
-                            ),
-                        })
-                        consecutive_successes = 0
 
                 # Convergence nudge — gentle for proof/inequality problems
                 # (they need sustained multi-step reasoning), aggressive for
@@ -444,6 +585,12 @@ class EnhancedReasoningAgent:
                 content = f"工具 {tool_name} 执行失败: {error}\n请检查参数或换一种方法。"
             elif result.get("verified") is True or str(result.get("verified")) == "true":
                 content = f"工具 {tool_name} 验证成功: {result_str}\n结论已确认, 可以继续下一步。"
+            elif result.get("verified") == "uncertain":
+                reason = result.get("reason", "")
+                content = (
+                    f"工具 {tool_name} 验证存疑({reason}): {result_str}\n"
+                    "可继续但请注意此步未严格证明。"
+                )
             elif result.get("verified") is False or str(result.get("verified")) == "false":
                 content = f"工具 {tool_name} 验证失败: {result_str}\n此路不通, 请尝试其他方法或修正推理。"
             elif result.get("success") is True:
@@ -490,8 +637,14 @@ class EnhancedReasoningAgent:
             return False
         if result.get("success") is False:
             return True
+        if result.get("status") == "retry_failed":
+            return True
         v = result.get("verified")
         if v is False or str(v) == "false":
+            # Mild retry-pending failures are handled by the targeted retry nudge
+            # and should not count toward the global consecutive-failure counter.
+            if result.get("status") == "retry":
+                return False
             return True
         return False
 

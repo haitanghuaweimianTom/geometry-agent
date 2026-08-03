@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional, Protocol, runtime_checkable
 
-from geometry_agent.types import GradeLevel
+from geometry_agent.types import GradeLevel, VerifyState
 from geometry_agent.verification._models import Step, Verdict
 from geometry_agent.verification.lean_client import LeanStepVerifier
 from geometry_agent.verification.symbolic import SymbolicStepVerifier
@@ -32,4 +32,5 @@ __all__ = [
     "Step",
     "StepVerifier",
     "build_verifier",
+    "VerifyState",
 ]
