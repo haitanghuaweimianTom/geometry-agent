@@ -45,13 +45,7 @@ function renderSolution(sol) {
   if (sol.reasoning_summary) {
     html += `<div class="summary-box"><h4>解题思路</h4>${escapeHtml(sol.reasoning_summary)}</div>`;
   }
-  if (sol.key_equations && sol.key_equations.length) {
-    html += `<div class="summary-box"><h4>关键算式</h4><ul class="key-eqs">`;
-    sol.key_equations.forEach((eq) => {
-      html += `<li>${escapeHtml(eq)}</li>`;
-    });
-    html += `</ul></div>`;
-  }
+
   if (sol.steps && sol.steps.length) {
     html += `<div class="steps"><h4 style="color:var(--muted);font-size:.85rem;margin-bottom:.4rem">解题步骤</h4>`;
     sol.steps.forEach((st) => {

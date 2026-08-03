@@ -947,7 +947,7 @@ def solution_to_latex(
     reasoning_summary = getattr(solution, "reasoning_summary", "") or ""
     reasoning_trace = getattr(solution, "reasoning_trace", [])
     key_equations = getattr(solution, "key_equations", []) or []
-    if reasoning_summary or reasoning_trace or key_equations:
+    if reasoning_summary or reasoning_trace:
         lines += _reasoning_appendix(reasoning_summary, reasoning_trace, key_equations)
 
     lines += ["", r"\end{document}"]
@@ -957,20 +957,18 @@ def solution_to_latex(
 def _reasoning_appendix(
     reasoning_summary: str,
     reasoning_trace: list[str],
-    key_equations: list[str],
+    key_equations: list[str] | None = None,  # noqa: ARG001 - no longer rendered
 ) -> list[str]:
-    """Render a '解题思路与关键算式' appendix.
+    """Render a '解题思路' appendix.
 
-    Both sections are written by the LLM itself (in its final JSON):
-    1. ``summary`` → 解题思路 (the model's own reasoning narrative).
-    2. ``key_equations`` → 关键算式 (the core formulas of the proof,
-       chosen by the model — NOT scraped from tool output).
+    The section is written by the LLM itself (in its final JSON):
+    ``summary`` → 解题思路 (the model's own reasoning narrative).
 
     Falls back to ``reasoning_trace`` entries only when ``summary`` is empty
     (legacy / fallback path). Tool-call outputs are never dumped here.
     """
     lines = [
-        r"\section*{五、解题思路与关键算式}",
+        r"\section*{五、解题思路}",
         "",
     ]
 
@@ -1001,16 +999,6 @@ def _reasoning_appendix(
         lines.append(_format_inline(summary))
         lines.append(r"\end{quote}")
         lines.append("")
-
-    # ---- Part 2: LLM-decided 关键算式 (no tool-output scraping) ----
-    if key_equations:
-        lines.append(r"\subsection*{关键算式}")
-        lines.append(r"\begin{itemize}[leftmargin=2em, itemsep=4pt]")
-        for eq in key_equations:
-            eq = (eq or "").strip()
-            if eq:
-                lines.append(rf"\item {_format_inline(eq)}")
-        lines.append(r"\end{itemize}")
 
     return lines
 
@@ -1108,7 +1096,7 @@ def multi_question_to_latex(
                 all_trace.append(f"【第{idx+1}问】{t}")
             for eq in getattr(sol, "key_equations", []) or []:
                 all_key_eqs.append(f"【第{idx+1}问】{eq}")
-    if all_summary or all_trace or all_key_eqs:
+    if all_summary or all_trace:
         lines += _reasoning_appendix(
             "；".join(all_summary), all_trace, all_key_eqs,
         )
