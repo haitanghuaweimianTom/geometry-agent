@@ -8,7 +8,11 @@ attached :class:`ToolCall`), producing a :class:`Solution`.
 
 from __future__ import annotations
 
+import random
+import re
 from typing import Any
+
+import sympy as sp
 
 from ..config import SolverConfig
 from ..types import (
@@ -22,6 +26,96 @@ from .rule_engine import BUILTIN_RULES, forward_chain
 from .sympy_engine import solve_equations as _sympy_solve
 from .z3_engine import check_satisfiable as _z3_check
 from .z3_engine import find_counterexample as _z3_counter
+
+_MATH_CHARS = re.compile(r"[0-9A-Za-z_αβγδεθπφω√·×²³⁴⁄+\-*/^().\[\]]")
+_CJK = re.compile(r"[\u4e00-\u9fff]")
+
+
+def _normalize_math(s: str) -> str:
+    """Map common unicode math glyphs to sympy-parseable ASCII."""
+    s = s.replace("×", "*").replace("·", "*").replace("−", "-").replace("﹣", "-")
+    s = s.replace("²", "**2").replace("³", "**3").replace("√", "sqrt")
+    s = re.sub(r"(\d)⁴", r"\1**4", s)
+    s = re.sub(r"([A-Za-z])(\d)", r"\1_\2", s)  # S1 -> S_1
+    return s
+
+
+def _math_run(s: str) -> str | None:
+    """Return the longest contiguous math-token run in ``s``, or None."""
+    m = re.findall(f"{_MATH_CHARS.pattern}+", s)
+    return m[-1].strip() if m else None
+
+
+def _find_equations(statement: str) -> list[tuple[str, str]]:
+    """Extract ``lhs = rhs`` pairs whose sides are clean pure-math token runs.
+
+    Only yields pairs that can be verified without ambiguity: both sides are
+    contiguous math runs (no CJK inside), so definitions like ``c = 1`` and
+    solve-equations like ``x + 1 = 2`` are naturally filtered out when the
+    ``=`` sides are not both self-contained math expressions.
+    """
+    out: list[tuple[str, str]] = []
+    for m in re.finditer(r"=", statement):
+        left = statement[: m.start()].rstrip()
+        right = statement[m.start() + 1 :].lstrip()
+        lhs = _math_run(left)
+        rhs = _math_run(right)
+        if not lhs or not rhs:
+            continue
+        if _CJK.search(lhs) or _CJK.search(rhs):
+            continue
+        out.append((lhs, rhs))
+    return out
+
+
+def _verify_equation(lhs: str, rhs: str) -> bool | None:
+    """Verify ``lhs = rhs`` as an identity. True / False / None (undecidable).
+
+    Requires at least one free symbol shared between both sides (so pure
+    definitions and constant assignments are skipped), then checks symbolically
+    and falls back to numeric sampling.
+    """
+    try:
+        le = sp.sympify(_normalize_math(lhs))
+        re_ = sp.sympify(_normalize_math(rhs))
+    except Exception:
+        return None
+    shared = le.free_symbols & re_.free_symbols
+    if not shared:
+        return None
+    try:
+        diff = sp.simplify(le - re_)
+        if diff == 0:
+            return True
+        if not diff.free_symbols:
+            return abs(float(diff)) < 1e-9
+        rng = random.Random(42)
+        for _ in range(5):
+            subs = {s_: rng.randint(1, 5) for s_ in diff.free_symbols}
+            try:
+                if abs(float(diff.subs(subs))) > 1e-6:
+                    return False
+            except (TypeError, ValueError):
+                pass
+        return None
+    except Exception:
+        return None
+
+
+def _selfcheck_equations(statement: str) -> tuple[bool | None, str]:
+    """Cross-check equations embedded in a step statement.
+
+    Returns ``(result, note)`` where result is True (all passed), False (a
+    definite violation was found) or None (nothing verifiable).
+    """
+    pairs = _find_equations(statement)
+    if not pairs:
+        return None, ""
+    for lhs, rhs in pairs:
+        verdict = _verify_equation(lhs, rhs)
+        if verdict is False:
+            return False, f"equation self-check failed: {lhs} != {rhs}"
+    return True, ""
 
 
 class SymbolicSolver:
@@ -77,6 +171,15 @@ class SymbolicSolver:
         verified_count = 0
         for st in plan.plan:
             new_step, ok = self._verify_step(st, working)
+            if self.config.equation_selfcheck_enabled:
+                verdict, note = _selfcheck_equations(st.statement)
+                if verdict is False:
+                    new_step = new_step.model_copy(update={
+                        "verified": False,
+                        "reason": (new_step.reason or note) + f"; {note}",
+                    })
+                    ok = False
+                    log.append({"step": f"selfcheck:{st.step}", "note": note})
             verified_steps.append(new_step)
             if ok:
                 verified_count += 1

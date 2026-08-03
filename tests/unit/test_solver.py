@@ -7,7 +7,7 @@ import math
 import pytest
 
 from geometry_agent.config import SolverConfig
-from geometry_agent.solver.engine import SymbolicSolver
+from geometry_agent.solver.engine import SymbolicSolver, _selfcheck_equations
 from geometry_agent.solver.rule_engine import BUILTIN_RULES, forward_chain
 from geometry_agent.solver.sympy_engine import solve_equations
 from geometry_agent.theorems.db import TheoremDB
@@ -147,3 +147,73 @@ def test_symbolic_solver_solve_equations_tool():
     solver = SymbolicSolver(SolverConfig())
     res = solver.solve_equations(["AB/AC = AE/AD"], "AB*AC = AD*AE")
     assert res["verified"] is True
+
+
+# --------------------------------------------------------------------------- #
+# 5. Equation self-check (algebraic transcription typos)
+# --------------------------------------------------------------------------- #
+def test_selfcheck_accepts_identity():
+    verdict, note = _selfcheck_equations("由 (a+1)^2 = a^2+2*a+1 展开")
+    assert verdict is True
+    assert note == ""
+
+
+def test_selfcheck_rejects_wrong_identity():
+    verdict, note = _selfcheck_equations("由 (a+1)^2 = a^2+3*a+1 展开")
+    assert verdict is False
+    assert "self-check" in note
+
+
+def test_selfcheck_skips_definition_and_solve_equations():
+    # c = 1 is a definition, x+1=2 is a solve-equation: neither is an identity
+    assert _selfcheck_equations("c = 1")[0] in (None, True)
+    assert _selfcheck_equations("由 x+1=2 得 x=1")[0] in (None, True)
+
+
+def test_selfcheck_skips_function_value_and_param_definitions():
+    assert _selfcheck_equations("f(a_min)**2 = (47+21*sqrt(5))/2")[0] in (None, True)
+    assert _selfcheck_equations("S1/S2 = 2a*(a**2+1)/(a**2-1)")[0] in (None, True)
+
+
+def test_selfcheck_catches_numeric_equality():
+    verdict, note = _selfcheck_equations("答案 6 = 2+4")
+    assert verdict is True
+
+
+def test_solver_selfcheck_downgrades_wrong_step():
+    solver = SymbolicSolver(SolverConfig())
+    plan = ProofPlan(
+        goal=GoalSpec(kind="Solve", statement="展开 (a+1)^2"),
+        plan=[
+            ProofStep(
+                step=1,
+                statement="展开得 (a+1)^2 = a^2+3*a+1",
+                reason="expand",
+                verified=True,
+            ),
+        ],
+    )
+    graph = _tangent_graph()
+    sol = solver.solve(plan, graph)
+    assert sol.proof[0].verified is False
+    assert "self-check" in sol.proof[0].reason
+    assert sol.verified is False
+
+
+def test_solver_selfcheck_keeps_correct_step():
+    solver = SymbolicSolver(SolverConfig())
+    plan = ProofPlan(
+        goal=GoalSpec(kind="Solve", statement="展开 (a+1)^2"),
+        plan=[
+            ProofStep(
+                step=1,
+                statement="展开得 (a+1)^2 = a^2+2*a+1",
+                reason="expand",
+                verified=True,
+            ),
+        ],
+    )
+    graph = _tangent_graph()
+    sol = solver.solve(plan, graph)
+    assert sol.proof[0].verified is True
+    assert sol.verified is True

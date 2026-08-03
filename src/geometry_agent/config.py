@@ -78,6 +78,7 @@ class SolverConfig(BaseModel):
     z3_enabled: bool = True
     rule_engine_enabled: bool = True
     lean_enabled: bool = False
+    equation_selfcheck_enabled: bool = True  # 自动数值核验步骤中形如 lhs = rhs 的等式
     theorem_db_path: str = "theorems/theorems.json"
 
 
