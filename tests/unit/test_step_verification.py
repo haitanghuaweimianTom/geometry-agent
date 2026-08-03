@@ -69,9 +69,9 @@ def test_build_verifier_accepts_lean_timeout_s() -> None:
     assert v.timeout_s == 42
 
 
-def test_symbolic_verifier_returns_uncertain_stub() -> None:
+def test_symbolic_verifier_unparseable_returns_uncertain() -> None:
     v = SymbolicStepVerifier()
-    s = Step(id="s1", statement="AB=CD")
+    s = Step(id="s1", statement="三角形ABC相似于三角形DEF")
     out = v.verify(s, [])
     assert out.verified == VerifyState.UNCERTAIN
 
@@ -84,11 +84,10 @@ def test_lean_verifier_returns_uncertain_stub() -> None:
     assert v.timeout_s == 5
 
 
-def test_parse_claim_raises_not_implemented() -> None:
+def test_parse_claim_returns_none_for_plain_text() -> None:
     from geometry_agent.verification.step_parser import parse_claim
 
-    with pytest.raises(NotImplementedError):
-        parse_claim("AB = CD")
+    assert parse_claim("just some text") is None
 
 
 def test_claim_step_tool_schema_exists():
