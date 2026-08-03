@@ -2,6 +2,24 @@
 
 > 竞赛模式 (`grade="competition"`) 需要远端 Lean HTTP 服务。服务不在本机,部署在局域网设备 rdzs02 (HP ProDesk 400 G5, i5-8500, 8GB RAM)。
 
+## 当前状态 (2026-08-03)
+
+**服务已部署并运行中** — `http://10.42.0.124:9407` 响应正常,开机自启通过 crontab @reboot 配置。
+
+- Lean 版本: v4.32.2 (手动解压到 `~/lean/lean-4.32.2-linux/`)
+- Python 依赖: fastapi 0.115.0 + uvicorn 0.30.6 + pydantic 2.9.2 (pip --user 离线 whl 安装到 `~/.local/`)
+- 启动脚本: `~/lean-svc/start.sh`
+- 日志: `~/lean-svc/uvicorn.log`
+- 代码: `~/lean-svc/lean_service.py`
+
+快速验证:
+```bash
+curl -s http://10.42.0.124:9407/health
+# {"status":"ok"}
+curl -s -X POST http://10.42.0.124:9407/verify -H 'Content-Type: application/json' -d '{"conclusion":"1+1=2"}'
+# {"verified":true,...}
+```
+
 ## 网络信息
 - 热点 IP: `10.42.0.124`
 - Tailscale IP: `100.74.221.60`
