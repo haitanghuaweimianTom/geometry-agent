@@ -23,6 +23,7 @@ dependencies = [
     "httpx>=0.25",
     "fastapi>=0.104",
     "uvicorn>=0.24",
+    "requests>=2.31",
     "structlog>=23.2",
     "matplotlib>=3.7",
 ]
