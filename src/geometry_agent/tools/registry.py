@@ -29,6 +29,7 @@ from geometry_agent.tools import polynomial_tools as _poly
 from geometry_agent.tools import conic_tools as _conic
 from geometry_agent.tools import function_tools as _func
 from geometry_agent.tools import algebra_tools as _algebra
+from geometry_agent.tools import projective_tools as _proj
 
 # Re-export the existing schema list so callers can reach it from one place.
 from geometry_agent.reasoning.tools import TOOL_SCHEMAS as _EXISTING_TOOL_SCHEMAS
@@ -730,6 +731,119 @@ _CODE_TOOL_SCHEMAS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "compare_coefficients",
+            "description": "逐项比较两个多项式在指定变量下的系数, 返回系数差异详情. 用于抽象证明: '对所有x, P(x)=Q(x)' 等价于各次幂系数相等. 也用于求未知参数: 令多项式恒为零, 各次幂系数为零, 解出未知数. 参数: expr1(多项式1), expr2(多项式2, 常用'0'), by_variable(按哪个变量比较), variables(可选).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expr1": {"type": "string", "description": "第一个多项式"},
+                    "expr2": {"type": "string", "description": "第二个多项式, 常为'0'"},
+                    "by_variable": {"type": "string", "description": "按哪个变量比较系数, 如'k'"},
+                    "variables": {"type": "array", "items": {"type": "string"}, "description": "变量名列表(可选)"},
+                },
+                "required": ["expr1", "expr2", "by_variable"],
+            },
+        },
+    },
+    # ---- Projective geometry tools ----
+    {
+        "type": "function",
+        "function": {
+            "name": "pole_of_point",
+            "description": "求点关于圆锥曲线的极线 (polar line). 极线是过该点作两条切线的切点连线. 若点在曲线上, 极线即切线. 用法一(标准型): conic_type='椭圆', a='2', b='1', point='x0,y0'. 用法二(一般方程): conic_eq='3*x**2 - y**2 - 3', point='x0,y0'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "point": {"type": "string", "description": "点坐标, 如 'x0,y0' 或 '2,1'"},
+                    "conic_eq": {"type": "string", "description": "圆锥曲线一般方程, 如 '3*x**2 - y**2 - 3'"},
+                    "conic_type": {"type": "string", "enum": ["椭圆", "双曲线", "抛物线", "圆"], "description": "标准型名称"},
+                    "a": {"type": "string", "description": "参数 a (或半径 r, 当为圆时)"},
+                    "b": {"type": "string", "description": "参数 b (椭圆/双曲线)"},
+                },
+                "required": ["point"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "polar_of_line",
+            "description": "求直线关于圆锥曲线的极点 (pole). 是 pole_of_point 的逆运算. 参数: line(直线方程, 如 'x+2=0'), conic_eq 或 conic_type+a+b.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "line": {"type": "string", "description": "直线方程, 如 'x+2=0' 或 '2*x+3*y-1=0'"},
+                    "conic_eq": {"type": "string", "description": "圆锥曲线一般方程"},
+                    "conic_type": {"type": "string", "enum": ["椭圆", "双曲线", "抛物线", "圆"]},
+                    "a": {"type": "string"},
+                    "b": {"type": "string"},
+                },
+                "required": ["line"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "cross_ratio",
+            "description": "计算四点 (A,B;C,D) 的交比. 四点须共线. 交比 = -1 表示调和分割. 参数: points(格式 'x1,y1; x2,y2; x3,y3; x4,y4').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "points": {"type": "string", "description": "四个点坐标, 分号分隔, 如 '0,0; 1,0; 2,0; 3,0'"},
+                },
+                "required": ["points"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "harmonic_conjugate",
+            "description": "求点C关于线段AB的调和共轭点D, 使 (A,B;C,D) = -1. 三点须共线. 参数: a,b,c 各为 'x,y' 格式.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "a": {"type": "string", "description": "点A坐标, 如 'x1,y1'"},
+                    "b": {"type": "string", "description": "点B坐标"},
+                    "c": {"type": "string", "description": "点C坐标"},
+                },
+                "required": ["a", "b", "c"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_harmonic",
+            "description": "验证四点 (A,B;C,D) 是否构成调和分割 (交比 = -1). 参数: points(格式 'x1,y1; x2,y2; x3,y3; x4,y4').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "points": {"type": "string", "description": "四个点, 分号分隔"},
+                },
+                "required": ["points"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "projective_transform",
+            "description": "求将四点 (A,B,C,D) 映射到 (A',B',C',D') 的射影变换矩阵 H (3×3). 用于将椭圆变圆等仿射/射影变换. 参数: from_points, to_points (各4个点, 分号分隔).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "from_points": {"type": "string", "description": "原四点, 如 '0,0; 1,0; 0,1; 1,1'"},
+                    "to_points": {"type": "string", "description": "目标四点, 同上格式"},
+                },
+                "required": ["from_points", "to_points"],
+            },
+        },
+    },
 ]
 
 
@@ -808,6 +922,9 @@ def get_tool_dispatchers(
         dispatchers[_name] = _make_structured(_fn)
     # Register algebra tools
     for _name, _fn in _algebra.TOOL_FUNCTIONS.items():
+        dispatchers[_name] = _make_structured(_fn)
+    # Register projective geometry tools
+    for _name, _fn in _proj.TOOL_FUNCTIONS.items():
         dispatchers[_name] = _make_structured(_fn)
 
     for name, fn in tools_dict.items():

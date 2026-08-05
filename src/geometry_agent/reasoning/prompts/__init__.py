@@ -20,6 +20,7 @@ ENHANCED_SYSTEM_PROMPT: str = _read("enhanced_system.txt")
 FEWSHOT_TRIANGLE: str = _read("fewshot_triangle.txt")
 FEWSHOT_PLANE: str = _read("fewshot_plane.txt")
 FEWSHOT_ANALYTIC: str = _read("fewshot_analytic.txt")
+FEWSHOT_ABSTRACT_PROOF: str = _read("fewshot_abstract_proof.txt")
 
 _FEWSHOT_MAP = {
     "triangle": "fewshot_triangle.txt",
@@ -31,6 +32,7 @@ _SUBJECT_FEWSHOT_MAP = {
     "triangle_solving": "fewshot_triangle.txt",
     "analytic_geometry": "fewshot_analytic.txt",
     "solid_geometry": "fewshot_plane.txt",  # fallback: no solid few-shot yet
+    "abstract_proof": "fewshot_abstract_proof.txt",
 }
 
 

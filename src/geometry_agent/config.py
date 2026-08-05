@@ -132,12 +132,30 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
 
     Precedence (highest first):
       1. Environment variables: LLM_API_KEY, LLM_BASE_URL, LLM_MODEL
-      2. YAML config file (configs/default.yaml)
-      3. Built-in defaults
+      2. .env file in project root
+      3. YAML config file (configs/default.yaml)
+      4. Built-in defaults
     """
     import os
 
     import yaml
+
+    # Load .env file if present (before YAML so YAML can override)
+    _env_path = Path(__file__).resolve().parents[2] / ".env"
+    if _env_path.exists():
+        try:
+            with open(_env_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, _, val = line.partition("=")
+                    key = key.strip()
+                    val = val.strip().strip("\"'")
+                    if key and key not in os.environ:
+                        os.environ[key] = val
+        except Exception:
+            pass
 
     settings = Settings()
     if config_path and Path(config_path).exists():

@@ -1,0 +1,14 @@
+[Unit]
+Description=SSH Reverse Tunnel to Geometry Agent Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tomgame
+ExecStart=/usr/bin/ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -N -R 4000:172.16.3.37:8002 ubuntu@193.112.202.56
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

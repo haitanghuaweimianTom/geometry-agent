@@ -1,0 +1,46 @@
+# Few-shot: Multi-Method Abstract Proof — Hyperbola Angle Bisector Fixed Point
+# Problem: 双曲线 C: 3x²-y²=3, 焦点 F(-2,0), 准线 l: x=-1/2, 顶点 A(-1,0), B(1,0).
+# 过 B 的直线交 C 于 N (第二象限), ∠NFB 的角平分线交 BN 于 T.
+# (i) 证 T 在定直线上; (ii) 连接 FN 交 C 于 M, 求 k_BN² - k_TM 的范围.
+# Goal: (i) T∈x=-1/2; (ii) 范围 [-9/4, 0).
+
+# === 方法一: 坐标代数法 (兜底) ===
+# Step 1: 设 BN: y=k(x-1), 联立双曲线求 N
+#   → call execute_code("import sympy as sp; k=sp.symbols('k'); x=sp.symbols('x'); eq=3*x**2-(k*(x-1))**2-3; sol=sp.solve(eq,x); print(sol)")
+#   → x=1 (B) 或 x=(k²+3)/(k²-3), N=((k²+3)/(k²-3), 6k/(k²-3))
+# Step 2: 角平分线定理 |BT|/|TN|=|FB|/|FN|=3/(-2x_N-1)
+#   → λ = (3-k²)/(k²+1), T = (B+λN)/(1+λ) = (-1/2, -3k/2)
+#   → T_x = -1/2 常数, 故 T 在定直线 x=-1/2 (准线) 上 ✓
+# Step 3: FN: y=m(x+2), m=2k/(k²-1), 联立双曲线求 M
+#   → 韦达定理: x_N+x_M = 4m²/(3-m²), 得 M=(-(3k²+1)/(3k²-1), 6k/(3k²-1))
+# Step 4: 硬算 k_TM
+#   → k_TM = (y_M-y_T)/(x_M-x_T) = ... = -3k
+# Step 5: k_BN² - k_TM = k² - (-3k) = k² + 3k, k∈(-√3,0), 范围 [-9/4, 0)
+
+# === 方法二: 几何观察 (A,T,M 共线) ===
+# Step 1: 验证 A(-1,0), T(-1/2,-3k/2), M 共线
+#   → k_AT = (-3k/2)/(1/2) = -3k
+#   → k_AM = (6k/(3k²-1))/(-(3k²+1)/(3k²-1)+1) = -3k
+#   → k_AT = k_AM → A,T,M 共线 ✓
+# Step 2: k_TM = k_AT = -3k, 一步到位, 无需代数通分
+
+# === 方法三: 射影几何 (调和同调) ===
+# 准线 l: x=-1/2 是焦点 F 关于双曲线 C 的极线.
+# 以 F 为中心、l 为轴的调和同调 H 保 C:
+#   H(N) = M (交换焦点弦两端)
+#   H(B) = A (交换顶点)
+#   H(BN) = AM
+# T = BN ∩ l 且 T ∈ l (轴), 故 H(T) = T.
+# 因此 T ∈ H(BN) = AM, 即 A,T,M 共线. ∎
+# 结果: k_TM = k_AT = -3k.
+
+# Final JSON output:
+# {"plan":[
+#   {"step":1,"statement":"N=((k²+3)/(k²-3), 6k/(k²-3))","reason":"联立BN与双曲线,韦达定理","verified":true},
+#   {"step":2,"statement":"T=(-1/2, -3k/2)","reason":"角平分线定理+定比分点","verified":true},
+#   {"step":3,"statement":"T在定直线x=-1/2上","reason":"x_T = -1/2 常数","verified":true,"tool_call":{"name":"verify","args":{"rel":"on_line","src":"T","dst":"x=-1/2"}}},
+#   {"step":4,"statement":"M=(-(3k²+1)/(3k²-1), 6k/(3k²-1))","reason":"韦达定理求FN与双曲线另一交点","verified":true},
+#   {"step":5,"statement":"k_TM = -3k","reason":"方法一:代数硬算; 方法二:k_AT=-3k且A,T,M共线; 方法三:调和同调H(BN)=AM","verified":true},
+#   {"step":6,"statement":"k_BN²-k_TM = k²+3k, 范围[-9/4,0)","reason":"二次函数求值域, k∈(-√3,0)","verified":true}
+# ],"goal":{"kind":"Prove","statement":"(i) T∈x=-1/2; (ii) k_BN²-k_TM∈[-9/4,0)"},
+# "summary":"方法一(坐标法)兜底求T和M坐标; 方法二(几何观察)发现A,T,M共线化简k_TM; 方法三(射影几何)以调和同调一行证完共线. 三种方法交叉验证, 结论一致."}

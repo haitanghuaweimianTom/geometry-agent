@@ -24,19 +24,18 @@ from typing import Any
 from ..config import LLMConfig
 from ..knowledge.subject_classifier import classify_subject
 from ..tools.registry import get_tool_dispatchers, get_tool_schemas
-from ..types import GoalSpec, GradeLevel, ProofPlan, ToolCall
+from ..types import GradeLevel, ProofPlan, ToolCall
 from .agent import _failure_desc, _has_failure
-from .cot import goal_spec, parse_plan
+from .cot import parse_plan
 from .experience import (
     ExperienceMemory,
     extract_experience,
-    generate_reflection_summary,
 )
 from .llm_client import LLMClient
 from .prompt_builder import build_enhanced_prompt
 from .prompts import fewshot_for, fewshot_for_subject
 from .reflection import reflect
-from .tools import TOOL_SCHEMAS, claim_step, dispatch
+from .tools import claim_step, dispatch
 from ..verification import build_verifier, Step, Verdict, VerifyState
 from ..verification.llm_judge import LLMJudge
 
@@ -137,7 +136,7 @@ class EnhancedReasoningAgent:
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
-    def reason(self, dsl: str, problem: str, tools: dict) -> ProofPlan:
+    def reason(self, dsl: str, problem: str, tools: dict, progress_callback=None) -> ProofPlan:
         """Produce a :class:`ProofPlan` for the given DSL + problem text.
 
         Two-phase approach:
@@ -155,7 +154,7 @@ class EnhancedReasoningAgent:
         subject = classify_subject(problem, dsl)
 
         if self.knowledge_manager is None:
-            return self._degrade_reason(dsl, problem, goal, effective)
+            return self._degrade_reason(dsl, problem, goal, effective, progress_callback=progress_callback)
 
         # ---- Retrieve experience from past attempts ---- #
         experience_text = self.experience_memory.format_for_prompt(problem, subject.value)
@@ -176,7 +175,7 @@ class EnhancedReasoningAgent:
             experience=experience_text, exploration_mode=False,
             grade=self.grade,
         )
-        plan = self._run_feedback_loop(messages, effective, goal)
+        plan = self._run_feedback_loop(messages, effective, goal, progress_callback=progress_callback)
 
         # ---- Phase 2: Exploration mode if phase 1 failed ---- #
         if _has_failure(plan) and not self.client.is_offline:
@@ -232,7 +231,7 @@ class EnhancedReasoningAgent:
                 "逆向分析等不同思路。任何计算交给工具。"
             ),
         })
-        return self._run_feedback_loop(messages, effective, goal)
+        return self._run_feedback_loop(messages, effective, goal, progress_callback=None)
 
     # ------------------------------------------------------------------ #
     # Phase 2b: Cross-grade escalation (junior → senior)
@@ -301,7 +300,7 @@ class EnhancedReasoningAgent:
                 "每步算出结果后立即记录, 全部算完后输出 JSON。"
             ),
         })
-        return self._run_feedback_loop(messages, effective, goal)
+        return self._run_feedback_loop(messages, effective, goal, progress_callback=None)
 
     # ------------------------------------------------------------------ #
     # Symbolic feedback loop (core engine)
@@ -311,6 +310,7 @@ class EnhancedReasoningAgent:
         messages: list[dict[str, Any]],
         tools_dict: dict[str, Any],
         goal: str,
+        progress_callback=None,
     ) -> ProofPlan:
         """Enhanced CoT loop with symbolic feedback.
 
@@ -452,6 +452,19 @@ class EnhancedReasoningAgent:
 
                     tool_log.append(ToolCall(name=name, args=args, result=result))
                     total_calls += 1
+
+                    # ---- Progress callback for SSE streaming ----
+                    if progress_callback:
+                        try:
+                            progress_callback({
+                                "event": "tool_call",
+                                "call": total_calls,
+                                "tool": name,
+                                "success": not self._is_failure(result),
+                                "result_summary": str(result)[:500] if isinstance(result, dict) else str(result)[:200],
+                            })
+                        except Exception:
+                            pass
 
                     # Build structured feedback message
                     feedback = self._build_feedback(name, result)
@@ -785,7 +798,7 @@ class EnhancedReasoningAgent:
         return merged
 
     def _degrade_reason(
-        self, dsl: str, problem: str, goal: str, effective: dict[str, Any]
+        self, dsl: str, problem: str, goal: str, effective: dict[str, Any], progress_callback=None,
     ) -> ProofPlan:
         from .cot import cot_reason
         fewshot = fewshot_for("triangle")

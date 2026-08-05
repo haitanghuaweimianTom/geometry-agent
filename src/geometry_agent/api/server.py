@@ -1,22 +1,26 @@
 """Geometry Agent — FastAPI backend.
 
 Run:
-    uvicorn geometry_agent.api.server:app --host 0.0.0.0 --port 8000 --reload
+    uvicorn geometry_agent.api.server:app --host 0.0.0.0 --port 8000
 
 Endpoints:
     GET  /                  → web UI (static/index.html)
     GET  /api/health        → liveness probe
     POST /api/solve         → solve a single problem, returns PDF + steps
+    POST /api/solve/stream  → SSE streaming solve
     POST /api/solve-multi   → solve a multi-part problem
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -46,6 +50,15 @@ _STATIC_DIR = Path(__file__).resolve().parents[3] / "static"
 
 app = FastAPI(title="Geometry Agent API", version="0.1.0")
 
+# CORS — allow all origins (no auth, so this is safe)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 def _grade(s: str) -> GradeLevel:
     return {
@@ -70,6 +83,7 @@ def _solve_one(
     p: GeometryPipeline,
     tools: dict,
     max_calls: int,
+    progress_callback=None,
 ) -> dict[str, Any]:
     """Run the reasoning loop with retry + numeric verification. Returns a dict."""
     t0 = time.time()
@@ -84,7 +98,9 @@ def _solve_one(
             grade=grade,
             experience_memory=ExperienceMemory(),
         )
-        plan = agent.reason("", text, tools)
+        if progress_callback:
+            progress_callback({"event": "attempt", "attempt": attempt + 1, "total": 3})
+        plan = agent.reason("", text, tools, progress_callback=progress_callback)
         sol = _extract_answer(plan)
         good = sol.confidence >= 0.5 and len(sol.proof) >= 2
         if good and is_fixed_pt:
@@ -153,7 +169,8 @@ def health():
 
 
 @app.post("/api/solve")
-def solve(req: SolveRequest):
+async def solve(req: SolveRequest):
+    """Solve a single problem (non-streaming)."""
     req.text = normalize_problem_text(req.text)
     if not req.text.strip():
         raise HTTPException(400, "题目文本不能为空")
@@ -161,7 +178,11 @@ def solve(req: SolveRequest):
     s = _settings(req.max_calls)
     p = GeometryPipeline(s)
     tools = p._tools(None) if hasattr(p, "_tools") else {}
-    res = _solve_one(req.text, grade, s, p, tools, req.max_calls)
+
+    loop = asyncio.get_event_loop()
+    res = await loop.run_in_executor(
+        None, _solve_one, req.text, grade, s, p, tools, req.max_calls
+    )
     sol = res["solution"]
     error = res.get("error")
     if error:
@@ -187,8 +208,96 @@ def solve(req: SolveRequest):
     )
 
 
+@app.post("/api/solve/stream")
+async def solve_stream(req: SolveRequest):
+    """SSE streaming solve endpoint."""
+    req.text = normalize_problem_text(req.text)
+    if not req.text.strip():
+        raise HTTPException(400, "题目文本不能为空")
+
+    async def event_stream() -> AsyncGenerator[str, None]:
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+        def _progress(evt: dict[str, Any]):
+            try:
+                queue.put_nowait(evt)
+            except Exception:
+                pass
+
+        yield _sse("start", {"message": "开始分析题目...", "text": req.text[:200]})
+
+        grade = _grade(req.grade)
+        s = _settings(req.max_calls)
+        p = GeometryPipeline(s)
+        tools = p._tools(None) if hasattr(p, "_tools") else {}
+
+        loop = asyncio.get_event_loop()
+
+        async def _run():
+            res = await loop.run_in_executor(
+                None, _solve_one, req.text, grade, s, p, tools, req.max_calls, _progress
+            )
+            await queue.put({"event": "done", "result": res})
+
+        task = asyncio.create_task(_run())
+
+        while True:
+            try:
+                evt = await asyncio.wait_for(queue.get(), timeout=120)
+            except asyncio.TimeoutError:
+                yield _sse("error", {"message": "求解超时"})
+                task.cancel()
+                return
+
+            if evt.get("event") == "done":
+                res = evt["result"]
+                sol = res["solution"]
+                error = res.get("error")
+                if error:
+                    yield _sse("error", {
+                        "message": error,
+                        "elapsed": round(res["elapsed"], 1),
+                    })
+                else:
+                    ts = int(time.time())
+                    pdf_name = f"outputs/solve_{ts}.pdf"
+                    pdf_path = solution_to_pdf(req.text, sol, None, pdf_name, "几何题解答报告")
+                    yield _sse("done", {
+                        "answer": sol.answer,
+                        "confidence": round(sol.confidence, 2),
+                        "verified": bool(sol.verified),
+                        "elapsed": round(res["elapsed"], 1),
+                        "retries": res["retries"],
+                        "steps": [
+                            {
+                                "step": st.step,
+                                "statement": st.statement,
+                                "reason": st.reason,
+                                "verified": st.verified,
+                            }
+                            for st in sol.proof
+                        ],
+                        "reasoning_summary": sol.reasoning_summary,
+                        "pdf": f"/api/pdf/{Path(pdf_path).name}",
+                    })
+                task.cancel()
+                return
+
+            yield _sse(evt.get("event", "progress"), evt)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.post("/api/solve-multi")
-def solve_multi(req: SolveMultiRequest):
+async def solve_multi(req: SolveMultiRequest):
     req.text = normalize_problem_text(req.text)
     if not req.text.strip():
         raise HTTPException(400, "题干不能为空")
@@ -198,11 +307,15 @@ def solve_multi(req: SolveMultiRequest):
     s = _settings(req.max_calls)
     p = GeometryPipeline(s)
     tools = p._tools(None) if hasattr(p, "_tools") else {}
+
+    loop = asyncio.get_event_loop()
     results = []
     for i, sub_text in enumerate(req.subs):
         sub_text = normalize_problem_text(sub_text)
         full_text = req.text + " " + sub_text
-        res = _solve_one(full_text, grade, s, p, tools, req.max_calls)
+        res = await loop.run_in_executor(
+            None, _solve_one, full_text, grade, s, p, tools, req.max_calls
+        )
         error = res.get("error")
         if error:
             return JSONResponse(
@@ -260,3 +373,10 @@ def get_pdf(name: str):
 # Serve the web UI
 if _STATIC_DIR.exists():
     app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="static")
+
+
+# --------------------------------------------------------------------------- #
+# Helpers
+# --------------------------------------------------------------------------- #
+def _sse(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"

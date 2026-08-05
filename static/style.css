@@ -137,6 +137,28 @@ textarea:focus, input:focus, select:focus { outline: none; border-color: var(--p
 
 #pdf-link-wrap { text-align: center; margin-top: 1rem; }
 
+/* ---- SSE streaming log ---- */
+.stream-log {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.8rem;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+.sse-msg { padding: 0.3rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.sse-time { color: var(--muted); margin-right: 0.5rem; font-size: 0.8rem; }
+.sse-call { color: var(--muted); font-size: 0.8rem; }
+.sse-summary { color: var(--muted); font-size: 0.8rem; margin-top: 0.2rem; padding-left: 0.5rem; border-left: 2px solid var(--border); }
+.sse-info { color: var(--text); }
+.sse-success { color: var(--success); }
+.sse-warn { color: #f59e0b; }
+.sse-error { color: var(--error); }
+.sse-done { color: var(--success); font-weight: 600; }
+
 footer {
   text-align: center; padding: 1.5rem; color: var(--muted);
   font-size: 0.85rem; border-top: 1px solid var(--border);

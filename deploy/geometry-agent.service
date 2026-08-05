@@ -1,0 +1,34 @@
+[Unit]
+Description=Geometry Agent API Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/geometry-agent
+Environment="PATH=/opt/geometry-agent/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/opt/geometry-agent/.venv/bin/gunicorn geometry_agent.api.server:app \
+    -k uvicorn.workers.UvicornWorker \
+    -w 2 \
+    -b 127.0.0.1:8000 \
+    --timeout 300 \
+    --graceful-timeout 30 \
+    --access-logfile - \
+    --error-logfile -
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geometry-agent
+
+# Security
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/geometry-agent/outputs
+ReadOnlyPaths=/opt/geometry-agent
+
+[Install]
+WantedBy=multi-user.target

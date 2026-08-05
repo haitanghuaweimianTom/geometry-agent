@@ -300,6 +300,72 @@ def collect_terms(
 
 
 # =====================================================================================
+# Tool: compare_coefficients — 系数比较 (抽象证明核心)
+# =====================================================================================
+def compare_coefficients(
+    expr1: str,
+    expr2: str,
+    by_variable: str,
+    variables: list[str] | None = None,
+) -> dict[str, Any]:
+    """逐项比较两个多项式在指定变量下的系数, 返回系数差异详情.
+
+    用于抽象证明： "对所有 x, P(x) = Q(x)" 等价于各次幂系数相等.
+    也用于求未知参数：令 P(x) ≡ 0, 则各次幂系数均为零, 解出未知数.
+
+    Args:
+        expr1: 第一个多项式, 如 "4*p*k**3 + (q**2-4*q-5)*k**2 + (q**2-1)"
+        expr2: 第二个多项式, 如 "0" (与零比较, 即求所有系数为零的条件)
+        by_variable: 按哪个变量比较系数, 如 "k"
+        variables: 变量名列表 (可选, 自动推断)
+
+    Returns:
+        {"success": True, "result": {"identical": bool, "coeff_diffs": {"k**2": "q**2-4*q-5", ...}}, "steps": "..."}
+    """
+    try:
+        e1, _ = _parse_expr(expr1, variables)
+        e2, _ = _parse_expr(expr2, variables)
+        sym = sp.Symbol(by_variable)
+        diff = sp.expand(e1 - e2)
+        try:
+            poly = sp.Poly(diff, sym)
+            coeffs = poly.as_dict()
+        except Exception:
+            coeffs = {0: diff}
+
+        identical = diff == 0
+        steps = f"系数比较 (按 {by_variable}):\n"
+        steps += f"  P({by_variable}) = {sp.latex(sp.expand(e1))}\n"
+        steps += f"  Q({by_variable}) = {sp.latex(sp.expand(e2))}\n"
+        steps += f"  P - Q = {sp.latex(diff)}\n"
+
+        if identical:
+            steps += "  所有系数相等 → 恒等式成立 ✓"
+        else:
+            steps += "  系数差异 (非零项):\n"
+            for deg in sorted(coeffs.keys(), reverse=True):
+                c = coeffs[deg]
+                if c != 0:
+                    if isinstance(deg, tuple):
+                        steps += f"    {by_variable}^{deg}: 差 = {sp.latex(c)}\n"
+                    else:
+                        steps += f"    {by_variable}^{deg}: 差 = {sp.latex(c)}\n"
+
+        return {
+            "success": True,
+            "result": {
+                "identical": identical,
+                "difference_poly": str(diff),
+                "coefficients": {str(k): str(v) for k, v in coeffs.items()},
+            },
+            "result_latex": sp.latex(diff),
+            "steps": steps,
+        }
+    except Exception as e:
+        return _err(f"系数比较失败: {e}")
+
+
+# =====================================================================================
 # Dispatch table
 # =====================================================================================
 TOOL_FUNCTIONS = {
@@ -312,6 +378,7 @@ TOOL_FUNCTIONS = {
     "polynomial_divide": polynomial_divide,
     "polynomial_gcd": polynomial_gcd,
     "collect_terms": collect_terms,
+    "compare_coefficients": compare_coefficients,
 }
 
 
